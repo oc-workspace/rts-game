@@ -93,7 +93,7 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     weaponRange: 42,
     damage: 16,
     cooldown: 0.7,
-    scale: 0.95,
+    scale: 1.05,
   },
   striker: {
     id: "striker",
@@ -104,7 +104,7 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     weaponRange: 34,
     damage: 8,
     cooldown: 1.1,
-    scale: 1.05,
+    scale: 1.12,
   },
   carrier: {
     id: "carrier",
@@ -115,7 +115,7 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     weaponRange: 42,
     damage: 12,
     cooldown: 1.6,
-    scale: 1.12,
+    scale: 1.18,
   },
 };
 
@@ -136,12 +136,12 @@ const selectedUnitOrder = getElement<HTMLElement>("#selected-unit-order");
 
 const random = createSeededRandom(SCENE_SEED);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x03070b);
-scene.fog = new THREE.FogExp2(0x03070b, 0.0003);
+scene.background = new THREE.Color(0x04090e);
+scene.fog = new THREE.FogExp2(0x04090e, 0.00022);
 
-const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 12000);
-const initialCameraFocus = new THREE.Vector3(2, -11, 0);
-const initialCameraPosition = new THREE.Vector3(72, 62, 132);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 12000);
+const initialCameraFocus = new THREE.Vector3(4, -10, 0);
+const initialCameraPosition = new THREE.Vector3(60, 50, 112);
 const cameraOffset = new THREE.Vector3().subVectors(
   initialCameraPosition,
   initialCameraFocus,
@@ -163,7 +163,7 @@ try {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.96;
+  renderer.toneMappingExposure = 1.08;
   renderer.domElement.setAttribute("aria-label", "3D deep space test range");
   app.append(renderer.domElement);
 } catch (error) {
@@ -178,17 +178,18 @@ try {
   throw error;
 }
 
-scene.add(new THREE.HemisphereLight(0x718896, 0x020406, 0.72));
+scene.add(new THREE.HemisphereLight(0x98aab2, 0x08090a, 1.35));
+scene.add(new THREE.AmbientLight(0x26323a, 0.5));
 
-const keyLight = new THREE.DirectionalLight(0xd2d8da, 3.1);
+const keyLight = new THREE.DirectionalLight(0xd2d8da, 4.2);
 keyLight.position.set(-90, 120, 86);
 scene.add(keyLight);
 
-const rimLight = new THREE.DirectionalLight(0x527b91, 1.9);
+const rimLight = new THREE.DirectionalLight(0x527b91, 3.1);
 rimLight.position.set(110, 24, -120);
 scene.add(rimLight);
 
-const warmFill = new THREE.DirectionalLight(0x7c5546, 0.75);
+const warmFill = new THREE.DirectionalLight(0x7c5546, 1.4);
 warmFill.position.set(-70, 8, -80);
 scene.add(warmFill);
 
@@ -214,7 +215,7 @@ const rangeGridMaterial = Array.isArray(rangeGrid.material)
   ? rangeGrid.material[0]
   : rangeGrid.material;
 rangeGridMaterial.transparent = true;
-rangeGridMaterial.opacity = 0.16;
+rangeGridMaterial.opacity = 0.2;
 scene.add(rangeGrid);
 
 const beacon = createNavigationBeacon();
@@ -964,25 +965,25 @@ function createShipView(unit: Unit): ShipView {
   const factionColor = unit.owner === "player" ? 0x5ca7b2 : 0xb86e56;
   const accentColor = unit.owner === "player" ? 0x8fcbd2 : 0xd7a188;
   const hullMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x202b31 : 0x322824,
+    color: unit.owner === "player" ? 0x3a484d : 0x4d3a34,
     emissive: unit.owner === "player" ? 0x020a0d : 0x0d0503,
-    emissiveIntensity: 0.22,
-    metalness: 0.76,
-    roughness: 0.46,
+    emissiveIntensity: 0.28,
+    metalness: 0.62,
+    roughness: 0.5,
     flatShading: true,
   });
   const armorMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x35444a : 0x4a3933,
+    color: unit.owner === "player" ? 0x52636a : 0x665047,
     emissive: 0x030405,
-    emissiveIntensity: 0.08,
-    metalness: 0.84,
-    roughness: 0.34,
+    emissiveIntensity: 0.12,
+    metalness: 0.7,
+    roughness: 0.4,
     flatShading: true,
   });
   const panelMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x10171b : 0x1a1412,
-    metalness: 0.68,
-    roughness: 0.58,
+    color: unit.owner === "player" ? 0x1d272c : 0x2a201d,
+    metalness: 0.58,
+    roughness: 0.62,
   });
   const accentMaterial = new THREE.MeshStandardMaterial({
     color: factionColor,
