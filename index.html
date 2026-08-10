@@ -22,7 +22,7 @@
       <section class="hud hud--bottom" aria-label="Simulation telemetry">
         <div class="telemetry">
           <span class="telemetry__label">SEED</span>
-          <strong id="seed-value">RTS-P3-001</strong>
+            <strong id="seed-value">RTS-P4-260810</strong>
         </div>
         <div class="telemetry">
           <span class="telemetry__label">SIMULATION</span>
@@ -40,8 +40,22 @@
           <span class="telemetry__label">FPS</span>
           <strong id="fps-value">--</strong>
         </div>
-        <p class="hint">LMB SELECT · RMB MOVE/ATTACK · S STOP · WHEEL ZOOM · MMB PAN · R RESET · N RESTART · P PAUSE</p>
+        <p class="hint">LMB SELECT · SHIFT BOX/ADD · SHIFT RMB QUEUE · CTRL 1-9 GROUP · 1-9 SELECT · S STOP · P PAUSE</p>
       </section>
+
+      <section id="fleet-panel" class="fleet-panel" aria-label="Player fleet control">
+        <div class="fleet-panel__header">
+          <span>PLAYER FLEET</span>
+          <strong id="group-values">NO GROUPS</strong>
+        </div>
+        <ul id="fleet-list" class="fleet-list"></ul>
+        <div class="minimap-frame">
+          <div class="minimap-frame__label">TACTICAL MAP // 72 KM RADIUS</div>
+          <canvas id="minimap" width="180" height="104" aria-label="Tactical map placeholder"></canvas>
+        </div>
+      </section>
+
+      <div id="selection-box" class="selection-box" hidden aria-hidden="true"></div>
 
       <section id="unit-card" class="unit-card" hidden aria-label="Selected unit status">
         <div class="unit-card__eyebrow">SELECTED UNIT</div>

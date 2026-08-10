@@ -11,6 +11,9 @@ const SHIP_Y = GROUND_Y + 5;
 type ShipClassId = "scout" | "striker" | "carrier";
 type Faction = "player" | "enemy";
 type UnitState = "idle" | "moving" | "attacking" | "destroyed";
+type UnitOrder =
+  | { type: "move"; targetPosition: Vec3 }
+  | { type: "attack"; targetUnitId: string };
 
 interface Vec3 {
   x: number;
@@ -42,6 +45,7 @@ interface Unit {
   health: number;
   cooldownRemaining: number;
   state: UnitState;
+  orderQueue: UnitOrder[];
   selected: boolean;
   destroyed: boolean;
 }
@@ -73,6 +77,7 @@ interface WorldState {
   units: Map<string, Unit>;
   neutrals: Map<string, NeutralObject>;
   selectedUnitIds: Set<string>;
+  groups: Map<number, Set<string>>;
   aimedTargetId: string | null;
   lastOrder: MoveOrder | AttackOrder | null;
   statusMessage: string;
@@ -146,6 +151,11 @@ const selectedUnitHealth = getElement<HTMLElement>("#selected-unit-health");
 const selectedUnitTarget = getElement<HTMLElement>("#selected-unit-target");
 const selectedUnitWeapon = getElement<HTMLElement>("#selected-unit-weapon");
 const selectedUnitOrder = getElement<HTMLElement>("#selected-unit-order");
+const fleetList = getElement<HTMLUListElement>("#fleet-list");
+const groupValues = getElement<HTMLElement>("#group-values");
+const minimapCanvas = getElement<HTMLCanvasElement>("#minimap");
+const selectionBox = getElement<HTMLDivElement>("#selection-box");
+const minimapContext = minimapCanvas.getContext("2d");
 
 const random = createSeededRandom(SCENE_SEED);
 const scene = new THREE.Scene();
@@ -269,6 +279,11 @@ let fpsWindowStart = previousTime;
 let isPanning = false;
 let lastPointerX = 0;
 let lastPointerY = 0;
+let isSelecting = false;
+let selectionStartX = 0;
+let selectionStartY = 0;
+let selectionEndX = 0;
+let selectionEndY = 0;
 
 runtimeStatus.textContent = "SYSTEM ONLINE";
 simulationStatus.textContent = "RUNNING";
@@ -355,8 +370,10 @@ function updatePlayerBehavior(state: WorldState, unit: Unit, step: number): void
     const target = state.units.get(unit.targetUnitId);
     if (!target || target.destroyed) {
       unit.targetUnitId = null;
-      unit.state = "idle";
-      state.statusMessage = "TARGET LOST";
+      if (!activateNextOrder(unit)) {
+        unit.state = "idle";
+        state.statusMessage = "TARGET LOST";
+      }
       return;
     }
 
@@ -383,14 +400,34 @@ function updatePlayerBehavior(state: WorldState, unit: Unit, step: number): void
     const arrived = advanceUnitToward(unit, unit.targetPosition, step);
     if (arrived) {
       unit.targetPosition = null;
-      unit.state = "idle";
-      state.statusMessage = "AT POSITION";
-      targetMarker.visible = false;
+      if (!activateNextOrder(unit)) {
+        unit.state = "idle";
+        state.statusMessage = "AT POSITION";
+        targetMarker.visible = false;
+      }
     }
     return;
   }
 
   unit.state = "idle";
+}
+
+function activateNextOrder(unit: Unit): boolean {
+  const nextOrder = unit.orderQueue.shift();
+  if (!nextOrder) {
+    return false;
+  }
+
+  if (nextOrder.type === "move") {
+    unit.targetPosition = { ...nextOrder.targetPosition };
+    unit.targetUnitId = null;
+    unit.state = "moving";
+  } else {
+    unit.targetUnitId = nextOrder.targetUnitId;
+    unit.targetPosition = null;
+    unit.state = "attacking";
+  }
+  return true;
 }
 
 function updateEnemyBehavior(state: WorldState, unit: Unit, step: number): void {
@@ -455,6 +492,7 @@ function destroyUnit(state: WorldState, unit: Unit, attacker: Unit): void {
   unit.targetUnitId = null;
   unit.targetPosition = null;
   unit.selected = false;
+  unit.orderQueue = [];
   state.selectedUnitIds.delete(unit.id);
   if (state.aimedTargetId === unit.id) {
     state.aimedTargetId = null;
@@ -597,6 +635,96 @@ function updateTelemetry(now: number): void {
       : "RUNNING";
   runtimeStatus.textContent =
     "SYSTEM ONLINE · T+" + simulationTime.toFixed(1).padStart(6, "0");
+  updateFleetHud();
+  updateMinimap();
+}
+
+function updateFleetHud(): void {
+  const playerUnits = [...world.units.values()].filter(
+    (unit) => unit.owner === "player",
+  );
+  fleetList.replaceChildren();
+
+  for (const unit of playerUnits) {
+    const entry = document.createElement("li");
+    entry.className = "fleet-list__entry";
+    if (unit.selected) {
+      entry.classList.add("fleet-list__entry--selected");
+    }
+    if (unit.destroyed) {
+      entry.classList.add("fleet-list__entry--destroyed");
+    }
+    const status = unit.destroyed
+      ? "LOST"
+      : unit.state === "attacking"
+        ? "ENGAGED"
+        : unit.state === "moving"
+          ? "MOVING"
+          : "READY";
+    const queue = unit.orderQueue.length > 0
+      ? " · Q" + unit.orderQueue.length
+      : "";
+    entry.textContent =
+      unit.id.toUpperCase() + "  " + status + queue;
+    fleetList.append(entry);
+  }
+
+  const groups = [...world.groups.entries()]
+    .filter(([, ids]) => ids.size > 0)
+    .map(([number, ids]) => "G" + number + " " + ids.size)
+    .join("  ·  ");
+  groupValues.textContent = groups || "NO GROUPS";
+}
+
+function updateMinimap(): void {
+  if (!minimapContext) {
+    return;
+  }
+
+  const width = minimapCanvas.width;
+  const height = minimapCanvas.height;
+  minimapContext.clearRect(0, 0, width, height);
+  minimapContext.fillStyle = "#071015";
+  minimapContext.fillRect(0, 0, width, height);
+  minimapContext.strokeStyle = "rgba(108, 146, 155, 0.24)";
+  minimapContext.lineWidth = 1;
+  minimapContext.strokeRect(0.5, 0.5, width - 1, height - 1);
+  minimapContext.beginPath();
+  minimapContext.moveTo(width / 2, 0);
+  minimapContext.lineTo(width / 2, height);
+  minimapContext.moveTo(0, height / 2);
+  minimapContext.lineTo(width, height / 2);
+  minimapContext.stroke();
+
+  const toMap = (position: Vec3): { x: number; y: number } => ({
+    x: ((position.x + BATTLEFIELD_RADIUS) / (BATTLEFIELD_RADIUS * 2)) * width,
+    y: ((position.z + BATTLEFIELD_RADIUS) / (BATTLEFIELD_RADIUS * 2)) * height,
+  });
+
+  for (const neutral of world.neutrals.values()) {
+    const point = toMap(neutral.position);
+    minimapContext.fillStyle = "rgba(111, 129, 132, 0.6)";
+    minimapContext.beginPath();
+    minimapContext.arc(point.x, point.y, Math.max(1.5, neutral.scale * 1.2), 0, Math.PI * 2);
+    minimapContext.fill();
+  }
+
+  for (const unit of world.units.values()) {
+    if (unit.destroyed) {
+      continue;
+    }
+    const point = toMap(unit.position);
+    minimapContext.fillStyle = unit.owner === "player" ? "#78b9c2" : "#bd6d58";
+    minimapContext.beginPath();
+    minimapContext.arc(point.x, point.y, unit.selected ? 3.4 : 2.2, 0, Math.PI * 2);
+    minimapContext.fill();
+    if (unit.selected) {
+      minimapContext.strokeStyle = "rgba(163, 218, 223, 0.9)";
+      minimapContext.beginPath();
+      minimapContext.arc(point.x, point.y, 5.4, 0, Math.PI * 2);
+      minimapContext.stroke();
+    }
+  }
 }
 
 function handleResize(): void {
@@ -629,6 +757,15 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (key === "s") {
     stopSelectedUnits();
   }
+
+  if (/^[1-9]$/.test(key)) {
+    const groupNumber = Number(key);
+    if (event.ctrlKey) {
+      assignControlGroup(groupNumber);
+    } else {
+      selectControlGroup(groupNumber);
+    }
+  }
 }
 
 function handlePointerDown(event: PointerEvent): void {
@@ -644,32 +781,50 @@ function handlePointerDown(event: PointerEvent): void {
 
   if (event.button === 0) {
     if (hit?.owner === "player") {
-      setSelection(hit.id);
+      setSelection(hit.id, event.shiftKey);
     } else if (hit?.owner === "enemy" && getSelectedUnit()) {
       world.aimedTargetId = hit.id;
       world.statusMessage =
         "TARGET LOCK · " + hit.id.toUpperCase() + " · RIGHT CLICK TO ATTACK";
       updateUnitCard();
     } else {
-      setSelection(null);
+      if (!event.shiftKey) {
+        setSelection(null);
+      }
+      const bounds = renderer.domElement.getBoundingClientRect();
+      selectionStartX = event.clientX - bounds.left;
+      selectionStartY = event.clientY - bounds.top;
+      selectionEndX = selectionStartX;
+      selectionEndY = selectionStartY;
+      isSelecting = true;
+      renderer.domElement.setPointerCapture(event.pointerId);
+      updateSelectionBox();
     }
     return;
   }
 
   if (event.button === 2) {
     if (hit?.owner === "enemy") {
-      issueAttackOrder(hit.id);
+      issueAttackOrder(hit.id, event.shiftKey);
       return;
     }
 
     const target = getGroundTarget(event);
     if (target && world.selectedUnitIds.size > 0) {
-      issueMoveOrder(target);
+      issueMoveOrder(target, event.shiftKey);
     }
   }
 }
 
 function handlePointerMove(event: PointerEvent): void {
+  if (isSelecting) {
+    const bounds = renderer.domElement.getBoundingClientRect();
+    selectionEndX = event.clientX - bounds.left;
+    selectionEndY = event.clientY - bounds.top;
+    updateSelectionBox();
+    return;
+  }
+
   if (!isPanning) {
     return;
   }
@@ -685,6 +840,18 @@ function handlePointerMove(event: PointerEvent): void {
 }
 
 function handlePointerUp(event: PointerEvent): void {
+  if (isSelecting) {
+    const distance = Math.hypot(
+      selectionEndX - selectionStartX,
+      selectionEndY - selectionStartY,
+    );
+    if (distance >= 6) {
+      selectUnitsInBox(event.shiftKey);
+    }
+    isSelecting = false;
+    selectionBox.hidden = true;
+  }
+
   isPanning = false;
   if (renderer.domElement.hasPointerCapture(event.pointerId)) {
     renderer.domElement.releasePointerCapture(event.pointerId);
@@ -746,24 +913,138 @@ function updatePointer(event: PointerEvent): void {
   pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
 }
 
-function setSelection(unitId: string | null): void {
-  world.selectedUnitIds.clear();
+function setSelection(unitId: string | null, additive = false): void {
+  if (!additive) {
+    world.selectedUnitIds.clear();
+  }
   world.aimedTargetId = null;
 
   for (const unit of world.units.values()) {
-    unit.selected = unit.id === unitId && unit.owner === "player";
+    if (unit.id !== unitId) {
+      if (!additive) {
+        unit.selected = false;
+      }
+      continue;
+    }
+    if (unit.owner === "player" && !unit.destroyed) {
+      if (additive && unit.selected) {
+        unit.selected = false;
+        world.selectedUnitIds.delete(unit.id);
+      } else {
+        unit.selected = true;
+        world.selectedUnitIds.add(unit.id);
+      }
+    }
+  }
+
+  world.statusMessage = formatSelectionStatus();
+  updateUnitCard();
+}
+
+function selectUnitsInBox(additive: boolean): void {
+  const minX = Math.min(selectionStartX, selectionEndX);
+  const maxX = Math.max(selectionStartX, selectionEndX);
+  const minY = Math.min(selectionStartY, selectionEndY);
+  const maxY = Math.max(selectionStartY, selectionEndY);
+  const bounds = renderer.domElement.getBoundingClientRect();
+  const selectedIds = new Set(additive ? world.selectedUnitIds : []);
+
+  if (!additive) {
+    for (const unit of world.units.values()) {
+      unit.selected = false;
+    }
+  }
+
+  for (const unit of world.units.values()) {
+    if (unit.owner !== "player" || unit.destroyed) {
+      continue;
+    }
+    const projected = new THREE.Vector3(
+      unit.position.x,
+      unit.position.y,
+      unit.position.z,
+    ).project(camera);
+    const screenX = ((projected.x + 1) / 2) * bounds.width;
+    const screenY = ((-projected.y + 1) / 2) * bounds.height;
+    if (
+      screenX >= minX &&
+      screenX <= maxX &&
+      screenY >= minY &&
+      screenY <= maxY
+    ) {
+      unit.selected = true;
+      selectedIds.add(unit.id);
+    }
+  }
+
+  world.selectedUnitIds = selectedIds;
+  world.aimedTargetId = null;
+  world.statusMessage = formatSelectionStatus();
+  updateUnitCard();
+}
+
+function updateSelectionBox(): void {
+  const minX = Math.min(selectionStartX, selectionEndX);
+  const minY = Math.min(selectionStartY, selectionEndY);
+  selectionBox.style.left = minX + "px";
+  selectionBox.style.top = minY + "px";
+  selectionBox.style.width = Math.abs(selectionEndX - selectionStartX) + "px";
+  selectionBox.style.height = Math.abs(selectionEndY - selectionStartY) + "px";
+  selectionBox.hidden = false;
+}
+
+function formatSelectionStatus(): string {
+  const count = world.selectedUnitIds.size;
+  return count === 0
+    ? "SELECT A PLAYER UNIT"
+    : count === 1
+      ? "SELECTED · RIGHT CLICK MOVE OR ATTACK"
+      : count + " UNITS SELECTED · RIGHT CLICK TO COMMAND";
+}
+
+function assignControlGroup(groupNumber: number): void {
+  const selectedIds = new Set(
+    [...world.selectedUnitIds].filter((id) => {
+      const unit = world.units.get(id);
+      return Boolean(unit && unit.owner === "player" && !unit.destroyed);
+    }),
+  );
+  if (selectedIds.size === 0) {
+    world.statusMessage = "SELECT UNITS BEFORE ASSIGNING GROUP";
+  } else {
+    world.groups.set(groupNumber, selectedIds);
+    world.statusMessage = "GROUP " + groupNumber + " ASSIGNED · " + selectedIds.size + " UNITS";
+  }
+  updateUnitCard();
+  updateFleetHud();
+}
+
+function selectControlGroup(groupNumber: number): void {
+  const group = world.groups.get(groupNumber);
+  if (!group) {
+    world.statusMessage = "GROUP " + groupNumber + " EMPTY";
+    updateUnitCard();
+    return;
+  }
+
+  const liveIds = [...group].filter((id) => {
+    const unit = world.units.get(id);
+    return Boolean(unit && unit.owner === "player" && !unit.destroyed);
+  });
+  world.groups.set(groupNumber, new Set(liveIds));
+  world.selectedUnitIds.clear();
+  for (const unit of world.units.values()) {
+    unit.selected = liveIds.includes(unit.id);
     if (unit.selected) {
       world.selectedUnitIds.add(unit.id);
     }
   }
-
-  world.statusMessage = unitId
-    ? "SELECTED · RIGHT CLICK MOVE OR ATTACK"
-    : "SELECT A PLAYER UNIT";
+  world.aimedTargetId = null;
+  world.statusMessage = "GROUP " + groupNumber + " SELECTED · " + liveIds.length + " UNITS";
   updateUnitCard();
 }
 
-function issueMoveOrder(target: Vec3): void {
+function issueMoveOrder(target: Vec3, queue = false): void {
   const selectedIds = [...world.selectedUnitIds];
   const order: MoveOrder = {
     type: "move",
@@ -772,20 +1053,27 @@ function issueMoveOrder(target: Vec3): void {
     createdAt: simulationTime,
   };
   world.lastOrder = order;
-  world.statusMessage = "MOVE ORDER · " + formatPosition(target);
+  world.statusMessage = (queue ? "QUEUED MOVE · " : "MOVE ORDER · ") + formatPosition(target);
 
-  for (const unitId of selectedIds) {
+  selectedIds.forEach((unitId, index) => {
     const unit = world.units.get(unitId);
     if (unit && !unit.destroyed) {
-      unit.targetPosition = { ...target };
-      unit.targetUnitId = null;
-      unit.state = "moving";
+      const nextOrder: UnitOrder = {
+        type: "move",
+        targetPosition: getFormationTarget(target, index, selectedIds.length),
+      };
+      if (queue && hasActiveOrder(unit)) {
+        unit.orderQueue.push(nextOrder);
+      } else {
+        unit.orderQueue = [];
+        applyOrder(unit, nextOrder);
+      }
     }
-  }
+  });
   updateUnitCard();
 }
 
-function issueAttackOrder(targetId: string): void {
+function issueAttackOrder(targetId: string, queue = false): void {
   const target = world.units.get(targetId);
   const selectedIds = [...world.selectedUnitIds];
   if (!target || target.destroyed || selectedIds.length === 0) {
@@ -803,14 +1091,19 @@ function issueAttackOrder(targetId: string): void {
   world.lastOrder = order;
   world.aimedTargetId = null;
   world.playerHasEngaged = true;
-  world.statusMessage = "ATTACK ORDER · " + targetId.toUpperCase();
+  world.statusMessage =
+    (queue ? "QUEUED ATTACK · " : "ATTACK ORDER · ") + targetId.toUpperCase();
 
   for (const unitId of selectedIds) {
     const unit = world.units.get(unitId);
     if (unit && !unit.destroyed) {
-      unit.targetUnitId = targetId;
-      unit.targetPosition = null;
-      unit.state = "attacking";
+      const nextOrder: UnitOrder = { type: "attack", targetUnitId: targetId };
+      if (queue && hasActiveOrder(unit)) {
+        unit.orderQueue.push(nextOrder);
+      } else {
+        unit.orderQueue = [];
+        applyOrder(unit, nextOrder);
+      }
     }
   }
   updateUnitCard();
@@ -822,6 +1115,7 @@ function stopSelectedUnits(): void {
     if (unit && !unit.destroyed) {
       unit.targetPosition = null;
       unit.targetUnitId = null;
+      unit.orderQueue = [];
       unit.state = "idle";
     }
   }
@@ -830,28 +1124,81 @@ function stopSelectedUnits(): void {
   updateUnitCard();
 }
 
+function hasActiveOrder(unit: Unit): boolean {
+  return Boolean(unit.targetPosition || unit.targetUnitId);
+}
+
+function applyOrder(unit: Unit, order: UnitOrder): void {
+  if (order.type === "move") {
+    unit.targetPosition = { ...order.targetPosition };
+    unit.targetUnitId = null;
+    unit.state = "moving";
+  } else {
+    unit.targetUnitId = order.targetUnitId;
+    unit.targetPosition = null;
+    unit.state = "attacking";
+  }
+}
+
+function getFormationTarget(target: Vec3, index: number, count: number): Vec3 {
+  const columns = Math.max(1, Math.ceil(Math.sqrt(count)));
+  const row = Math.floor(index / columns);
+  const column = index % columns;
+  const width = Math.min(columns, count - row * columns);
+  const offsetX = (column - (width - 1) / 2) * 4.5;
+  const offsetZ = -row * 4.5;
+  return {
+    x: THREE.MathUtils.clamp(
+      target.x + offsetX,
+      -BATTLEFIELD_RADIUS,
+      BATTLEFIELD_RADIUS,
+    ),
+    y: SHIP_Y,
+    z: THREE.MathUtils.clamp(
+      target.z + offsetZ,
+      -BATTLEFIELD_RADIUS,
+      BATTLEFIELD_RADIUS,
+    ),
+  };
+}
+
 function updateUnitCard(): void {
-  const unit = getSelectedUnit();
+  const selectedUnits = [...world.selectedUnitIds]
+    .map((id) => world.units.get(id))
+    .filter((unit): unit is Unit => Boolean(unit && !unit.destroyed));
+  const unit = selectedUnits[0] ?? null;
   if (!unit) {
     unitCard.hidden = true;
     return;
   }
 
   const shipClass = getShipClass(unit);
+  const totalHealth = selectedUnits.reduce((sum, selected) => sum + selected.health, 0);
+  const totalMaxHealth = selectedUnits.reduce(
+    (sum, selected) => sum + getShipClass(selected).maxHealth,
+    0,
+  );
   const target = unit.targetUnitId
     ? world.units.get(unit.targetUnitId)
     : world.aimedTargetId
       ? world.units.get(world.aimedTargetId)
       : null;
   unitCard.hidden = false;
-  selectedUnitName.textContent = unit.id.toUpperCase();
-  selectedUnitClass.textContent = shipClass.name + " // " + shipClass.role;
-  selectedUnitHealth.textContent = unit.health + " / " + shipClass.maxHealth;
+  selectedUnitName.textContent = selectedUnits.length > 1
+    ? selectedUnits.length + " UNITS"
+    : unit.id.toUpperCase();
+  selectedUnitClass.textContent = selectedUnits.length > 1
+    ? "FLEET SELECTION // MIXED CLASS"
+    : shipClass.name + " // " + shipClass.role;
+  selectedUnitHealth.textContent = selectedUnits.length > 1
+    ? totalHealth + " / " + totalMaxHealth
+    : unit.health + " / " + shipClass.maxHealth;
   selectedUnitTarget.textContent = target
     ? target.id.toUpperCase() + " // " + getShipClass(target).name
     : "NONE";
-  selectedUnitWeapon.textContent =
-    unit.cooldownRemaining > 0
+  selectedUnitWeapon.textContent = selectedUnits.length > 1
+    ? "QUEUE " + selectedUnits.reduce((sum, selected) => sum + selected.orderQueue.length, 0)
+    : unit.cooldownRemaining > 0
       ? "COOLDOWN " + unit.cooldownRemaining.toFixed(1) + "S"
       : "READY";
   selectedUnitOrder.textContent = world.statusMessage;
@@ -963,6 +1310,7 @@ function createWorldState(): WorldState {
     units: new Map(encounter.units.map((unit) => [unit.id, unit])),
     neutrals: new Map(encounter.neutrals.map((neutral) => [neutral.id, neutral])),
     selectedUnitIds: new Set(),
+    groups: new Map(),
     aimedTargetId: null,
     lastOrder: null,
     statusMessage: "SELECT A PLAYER UNIT",
@@ -1087,6 +1435,7 @@ function createUnit(
     health: shipClass.maxHealth,
     cooldownRemaining: 0,
     state: "idle",
+    orderQueue: [],
     selected: false,
     destroyed: false,
   };

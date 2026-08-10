@@ -190,6 +190,101 @@ h1 {
   text-align: right;
 }
 
+.fleet-panel {
+  position: absolute;
+  z-index: 2;
+  top: 5.7rem;
+  right: clamp(1.3rem, 3vw, 2.4rem);
+  width: min(15.5rem, calc(100% - 2.6rem));
+  padding: 0.7rem 0.8rem 0.8rem;
+  border: 1px solid rgba(105, 137, 146, 0.18);
+  border-right: 2px solid rgba(164, 93, 76, 0.64);
+  background: linear-gradient(145deg, rgba(12, 22, 27, 0.84), rgba(4, 9, 13, 0.72));
+  box-shadow: 0 0.75rem 2.5rem rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(7px);
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.fleet-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgba(95, 118, 125, 0.16);
+  color: #688c95;
+  font-size: 0.48rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.fleet-panel__header strong {
+  color: #9d7167;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.47rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.fleet-list {
+  display: grid;
+  gap: 0.22rem;
+  margin: 0.55rem 0 0.7rem;
+  padding: 0;
+  list-style: none;
+}
+
+.fleet-list__entry {
+  overflow: hidden;
+  padding: 0.22rem 0.3rem;
+  border-left: 1px solid rgba(101, 125, 133, 0.18);
+  color: #65777d;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.48rem;
+  letter-spacing: 0.05em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-list__entry--selected {
+  border-left-color: #76b5be;
+  color: #b8d0d3;
+  background: rgba(92, 167, 178, 0.1);
+}
+
+.fleet-list__entry--destroyed {
+  color: #805b55;
+  text-decoration: line-through;
+}
+
+.minimap-frame {
+  display: grid;
+  gap: 0.36rem;
+}
+
+.minimap-frame__label {
+  color: #4e6067;
+  font-size: 0.43rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+#minimap {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(108, 146, 155, 0.18);
+  image-rendering: auto;
+}
+
+.selection-box {
+  position: absolute;
+  z-index: 3;
+  border: 1px solid rgba(127, 193, 201, 0.82);
+  background: rgba(92, 167, 178, 0.1);
+  pointer-events: none;
+}
+
 .unit-card {
   position: absolute;
   z-index: 2;
@@ -328,5 +423,15 @@ h1 {
 
   .unit-card {
     bottom: 9.4rem;
+  }
+
+  .fleet-panel {
+    top: 5.2rem;
+    right: 1.3rem;
+    width: min(13rem, calc(100% - 2.6rem));
+  }
+
+  .fleet-list {
+    display: none;
   }
 }
