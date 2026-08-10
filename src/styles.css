@@ -98,7 +98,7 @@ body {
   bottom: 0;
   left: 0;
   display: grid;
-  grid-template-columns: repeat(4, max-content) minmax(0, 1fr);
+    grid-template-columns: repeat(5, max-content) minmax(0, 1fr);
   align-items: end;
   gap: clamp(1rem, 2.5vw, 2.6rem);
   padding: 0.85rem clamp(1.3rem, 3vw, 2.4rem) 1.15rem;

@@ -2,7 +2,9 @@ import * as THREE from "three";
 import "./styles.css";
 
 const FIXED_STEP = 1 / 60;
-const SCENE_SEED = 20260810;
+const DEFAULT_SEED = 20260810;
+const SCENE_SEED = readSeedFromUrl();
+const BATTLEFIELD_RADIUS = 72;
 const GROUND_Y = -18;
 const SHIP_Y = GROUND_Y + 5;
 
@@ -44,6 +46,14 @@ interface Unit {
   destroyed: boolean;
 }
 
+interface NeutralObject {
+  id: string;
+  position: Vec3;
+  scale: number;
+  rotation: Vec3;
+  spin: Vec3;
+}
+
 interface MoveOrder {
   type: "move";
   sourceUnitIds: string[];
@@ -61,6 +71,7 @@ interface AttackOrder {
 interface WorldState {
   seed: number;
   units: Map<string, Unit>;
+  neutrals: Map<string, NeutralObject>;
   selectedUnitIds: Set<string>;
   aimedTargetId: string | null;
   lastOrder: MoveOrder | AttackOrder | null;
@@ -124,6 +135,8 @@ const runtimeStatus = getElement<HTMLElement>("#runtime-status");
 const simulationStatus = getElement<HTMLElement>("#simulation-status");
 const unitCount = getElement<HTMLElement>("#unit-count");
 const fpsValue = getElement<HTMLElement>("#fps-value");
+const seedValue = getElement<HTMLElement>("#seed-value");
+const encounterValue = getElement<HTMLElement>("#encounter-value");
 const fatalError = getElement<HTMLElement>("#fatal-error");
 const fatalErrorMessage = getElement<HTMLElement>("#fatal-error-message");
 const unitCard = getElement<HTMLElement>("#unit-card");
@@ -229,10 +242,16 @@ scene.add(targetMarker);
 
 const world = createWorldState();
 const shipViews = new Map<string, ShipView>();
+const neutralViews = new Map<string, THREE.Group>();
 for (const unit of world.units.values()) {
   const view = createShipView(unit);
   shipViews.set(unit.id, view);
   scene.add(view.group);
+}
+for (const neutral of world.neutrals.values()) {
+  const view = createNeutralView(neutral);
+  neutralViews.set(neutral.id, view);
+  scene.add(view);
 }
 
 const combatEffects: CombatEffect[] = [];
@@ -297,6 +316,16 @@ function updateSimulation(state: WorldState, step: number): void {
     beaconOuterRing.rotation.z += step * 0.08;
   }
   rangeGrid.rotation.y += step * 0.006;
+
+  for (const neutral of state.neutrals.values()) {
+    const view = neutralViews.get(neutral.id);
+    if (!view) {
+      continue;
+    }
+    view.rotation.x += neutral.spin.x * step;
+    view.rotation.y += neutral.spin.y * step;
+    view.rotation.z += neutral.spin.z * step;
+  }
 
   for (const unit of state.units.values()) {
     if (unit.destroyed) {
@@ -550,6 +579,14 @@ function updateTelemetry(now: number): void {
   const aliveCount = [...world.units.values()].filter(
     (unit) => !unit.destroyed,
   ).length;
+  const playerAlive = [...world.units.values()].filter(
+    (unit) => unit.owner === "player" && !unit.destroyed,
+  ).length;
+  const enemyAlive = [...world.units.values()].filter(
+    (unit) => unit.owner === "enemy" && !unit.destroyed,
+  ).length;
+  seedValue.textContent = formatSeedLabel(world.seed);
+  encounterValue.textContent = playerAlive + "V" + enemyAlive;
   unitCount.textContent = String(aliveCount);
   simulationStatus.textContent = world.winner
     ? world.winner === "player"
@@ -697,9 +734,9 @@ function getGroundTarget(event: PointerEvent): Vec3 | null {
   }
 
   return {
-    x: THREE.MathUtils.clamp(pointerWorld.x, -74, 74),
+    x: THREE.MathUtils.clamp(pointerWorld.x, -BATTLEFIELD_RADIUS, BATTLEFIELD_RADIUS),
     y: SHIP_Y,
-    z: THREE.MathUtils.clamp(pointerWorld.z, -74, 74),
+    z: THREE.MathUtils.clamp(pointerWorld.z, -BATTLEFIELD_RADIUS, BATTLEFIELD_RADIUS),
   };
 }
 
@@ -887,17 +924,29 @@ function resetEncounter(): void {
   world.aimedTargetId = null;
   world.playerHasEngaged = false;
 
-  for (const initialUnit of createInitialUnits()) {
-    const unit = world.units.get(initialUnit.id);
-    if (!unit) {
-      continue;
+  const freshUnits = new Map(
+    createEncounter(world.seed).units.map((unit) => [unit.id, unit]),
+  );
+
+  for (const [id, view] of shipViews) {
+    if (!freshUnits.has(id)) {
+      scene.remove(view.group);
+      shipViews.delete(id);
     }
-    Object.assign(unit, initialUnit);
+  }
+
+  for (const unit of freshUnits.values()) {
+    if (!shipViews.has(unit.id)) {
+      const view = createShipView(unit);
+      shipViews.set(unit.id, view);
+      scene.add(view.group);
+    }
     const view = shipViews.get(unit.id);
     if (view) {
       view.group.visible = true;
     }
   }
+  world.units = freshUnits;
 
   clearCombatEffects();
   world.selectedUnitIds.clear();
@@ -908,9 +957,11 @@ function resetEncounter(): void {
 }
 
 function createWorldState(): WorldState {
+  const encounter = createEncounter(SCENE_SEED);
   return {
     seed: SCENE_SEED,
-    units: new Map(createInitialUnits().map((unit) => [unit.id, unit])),
+    units: new Map(encounter.units.map((unit) => [unit.id, unit])),
+    neutrals: new Map(encounter.neutrals.map((neutral) => [neutral.id, neutral])),
     selectedUnitIds: new Set(),
     aimedTargetId: null,
     lastOrder: null,
@@ -920,12 +971,98 @@ function createWorldState(): WorldState {
   };
 }
 
-function createInitialUnits(): Unit[] {
-  return [
-    createUnit("scout-01", "player", "scout", -34, 28, 0),
-    createUnit("striker-01", "enemy", "striker", 12, -8, Math.PI),
-    createUnit("carrier-01", "enemy", "carrier", 36, -30, Math.PI),
+function createEncounter(seed: number): {
+  units: Unit[];
+  neutrals: NeutralObject[];
+} {
+  const encounterRandom = createSeededRandom(seed ^ 0x9e3779b9);
+  const playerCount = 3 + Math.floor(encounterRandom() * 2);
+  const enemyCount = 3 + Math.floor(encounterRandom() * 2);
+  const playerAnchor = {
+    x: -30 + encounterRandom() * 8,
+    z: 24 + encounterRandom() * 8,
+  };
+  const enemyAnchor = {
+    x: 28 - encounterRandom() * 8,
+    z: -24 - encounterRandom() * 8,
+  };
+
+  return {
+    units: [
+      ...createFleet("player", playerCount, playerAnchor, 0, encounterRandom),
+      ...createFleet("enemy", enemyCount, enemyAnchor, Math.PI, encounterRandom),
+    ],
+    neutrals: createNeutralObjects(encounterRandom),
+  };
+}
+
+function createFleet(
+  owner: Faction,
+  count: number,
+  anchor: { x: number; z: number },
+  heading: number,
+  nextRandom: () => number,
+): Unit[] {
+  const playerPattern: ShipClassId[] = ["scout", "striker", "carrier", "scout"];
+  const enemyPattern: ShipClassId[] = ["striker", "carrier", "scout", "striker"];
+  const pattern = owner === "player" ? playerPattern : enemyPattern;
+  const prefix = owner === "player" ? "p" : "e";
+  const offsets = [
+    { x: 0, z: 0 },
+    { x: -2.4, z: -4.2 },
+    { x: 2.4, z: -4.2 },
+    { x: 0, z: -8.2 },
   ];
+
+  return Array.from({ length: count }, (_, index) => {
+    const classId =
+      index === 0
+        ? pattern[0]
+        : pattern[Math.floor(nextRandom() * pattern.length)];
+    const offset = offsets[index] ?? {
+      x: (index % 2 === 0 ? -1 : 1) * (3 + index),
+      z: -10 - index * 3,
+    };
+    const cosine = Math.cos(heading);
+    const sine = Math.sin(heading);
+    const x = anchor.x + offset.x * cosine + offset.z * sine;
+    const z = anchor.z - offset.x * sine + offset.z * cosine;
+    return createUnit(
+      prefix + "-" + classId + "-" + String(index + 1).padStart(2, "0"),
+      owner,
+      classId,
+      x,
+      z,
+      heading,
+    );
+  });
+}
+
+function createNeutralObjects(nextRandom: () => number): NeutralObject[] {
+  const count = 7 + Math.floor(nextRandom() * 4);
+  return Array.from({ length: count }, (_, index) => {
+    const angle = nextRandom() * Math.PI * 2;
+    const radius = 16 + nextRandom() * 44;
+    return {
+      id: "asteroid-" + String(index + 1).padStart(2, "0"),
+      position: {
+        x: Math.cos(angle) * radius,
+        y: GROUND_Y + 1.1 + nextRandom() * 1.4,
+        z: Math.sin(angle) * radius,
+      },
+      scale: 0.8 + nextRandom() * 1.7,
+      rotation: {
+        x: nextRandom() * Math.PI,
+        y: nextRandom() * Math.PI,
+        z: nextRandom() * Math.PI,
+      },
+      spin: {
+        x: -0.06 + nextRandom() * 0.12,
+        y: -0.08 + nextRandom() * 0.16,
+        z: -0.06 + nextRandom() * 0.12,
+      },
+    };
+  });
 }
 
 function createUnit(
@@ -953,6 +1090,50 @@ function createUnit(
     selected: false,
     destroyed: false,
   };
+}
+
+function createNeutralView(neutral: NeutralObject): THREE.Group {
+  const group = new THREE.Group();
+  group.name = neutral.id + "-view";
+  group.position.set(
+    neutral.position.x,
+    neutral.position.y,
+    neutral.position.z,
+  );
+  group.rotation.set(
+    neutral.rotation.x,
+    neutral.rotation.y,
+    neutral.rotation.z,
+  );
+  group.scale.setScalar(neutral.scale);
+
+  const body = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(2.2, 1),
+    new THREE.MeshStandardMaterial({
+      color: 0x3b4548,
+      emissive: 0x020506,
+      emissiveIntensity: 0.12,
+      metalness: 0.48,
+      roughness: 0.82,
+      flatShading: true,
+    }),
+  );
+  body.scale.set(1.1, 0.72, 1.22);
+  group.add(body);
+
+  const facet = new THREE.Mesh(
+    new THREE.TetrahedronGeometry(0.85, 0),
+    new THREE.MeshStandardMaterial({
+      color: 0x20292b,
+      metalness: 0.58,
+      roughness: 0.76,
+      flatShading: true,
+    }),
+  );
+  facet.position.set(0.6, 0.7, 0.35);
+  facet.rotation.set(0.2, 0.5, -0.3);
+  group.add(facet);
+  return group;
 }
 
 function createShipView(unit: Unit): ShipView {
@@ -1218,6 +1399,20 @@ function createAngularHullGeometry(
   geometry.rotateX(Math.PI / 2);
   geometry.computeVertexNormals();
   return geometry;
+}
+
+function readSeedFromUrl(): number {
+  const rawSeed = new URLSearchParams(window.location.search).get("seed");
+  if (!rawSeed) {
+    return DEFAULT_SEED;
+  }
+
+  const parsedSeed = Number.parseInt(rawSeed, 10);
+  return Number.isFinite(parsedSeed) ? parsedSeed >>> 0 : DEFAULT_SEED;
+}
+
+function formatSeedLabel(seed: number): string {
+  return "RTS-P4-" + String(seed >>> 0).slice(-6).padStart(6, "0");
 }
 
 function createAttackEffect(attacker: Unit, target: Unit): void {
