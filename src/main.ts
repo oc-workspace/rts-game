@@ -93,7 +93,7 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     weaponRange: 42,
     damage: 16,
     cooldown: 0.7,
-    scale: 0.8,
+    scale: 0.95,
   },
   striker: {
     id: "striker",
@@ -104,7 +104,7 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     weaponRange: 34,
     damage: 8,
     cooldown: 1.1,
-    scale: 1,
+    scale: 1.05,
   },
   carrier: {
     id: "carrier",
@@ -115,7 +115,7 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     weaponRange: 42,
     damage: 12,
     cooldown: 1.6,
-    scale: 1.25,
+    scale: 1.12,
   },
 };
 
@@ -136,12 +136,12 @@ const selectedUnitOrder = getElement<HTMLElement>("#selected-unit-order");
 
 const random = createSeededRandom(SCENE_SEED);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020617);
-scene.fog = new THREE.FogExp2(0x020617, 0.00022);
+scene.background = new THREE.Color(0x03070b);
+scene.fog = new THREE.FogExp2(0x03070b, 0.0003);
 
-const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 12000);
-const initialCameraFocus = new THREE.Vector3(0, -12, 0);
-const initialCameraPosition = new THREE.Vector3(0, 74, 158);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 12000);
+const initialCameraFocus = new THREE.Vector3(2, -11, 0);
+const initialCameraPosition = new THREE.Vector3(72, 62, 132);
 const cameraOffset = new THREE.Vector3().subVectors(
   initialCameraPosition,
   initialCameraFocus,
@@ -163,7 +163,7 @@ try {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 0.96;
   renderer.domElement.setAttribute("aria-label", "3D deep space test range");
   app.append(renderer.domElement);
 } catch (error) {
@@ -178,33 +178,49 @@ try {
   throw error;
 }
 
-scene.add(new THREE.HemisphereLight(0x9bdcff, 0x07111f, 1.5));
+scene.add(new THREE.HemisphereLight(0x718896, 0x020406, 0.72));
 
-const keyLight = new THREE.DirectionalLight(0xbbe7ff, 2.8);
-keyLight.position.set(80, 120, 50);
+const keyLight = new THREE.DirectionalLight(0xd2d8da, 3.1);
+keyLight.position.set(-90, 120, 86);
 scene.add(keyLight);
 
-const starfield = createStarfield(random, 2200);
+const rimLight = new THREE.DirectionalLight(0x527b91, 1.9);
+rimLight.position.set(110, 24, -120);
+scene.add(rimLight);
+
+const warmFill = new THREE.DirectionalLight(0x7c5546, 0.75);
+warmFill.position.set(-70, 8, -80);
+scene.add(warmFill);
+
+const starfield = createStarfield(random, 1700);
 scene.add(starfield);
+
+const spaceDust = createSpaceDust(random, 260);
+scene.add(spaceDust);
+
+const distantPlanet = createDistantPlanet();
+scene.add(distantPlanet);
 
 const rangeGrid = new THREE.PolarGridHelper(
   82,
   20,
   12,
   64,
-  0x164e63,
-  0x0f2940,
+  0x263942,
+  0x111b20,
 );
 rangeGrid.position.y = GROUND_Y;
 const rangeGridMaterial = Array.isArray(rangeGrid.material)
   ? rangeGrid.material[0]
   : rangeGrid.material;
 rangeGridMaterial.transparent = true;
-rangeGridMaterial.opacity = 0.32;
+rangeGridMaterial.opacity = 0.16;
 scene.add(rangeGrid);
 
 const beacon = createNavigationBeacon();
 scene.add(beacon);
+const beaconInnerRing = beacon.getObjectByName("beacon-inner-ring");
+const beaconOuterRing = beacon.getObjectByName("beacon-outer-ring");
 
 const targetMarker = createTargetMarker();
 targetMarker.visible = false;
@@ -272,9 +288,13 @@ function render(now: number): void {
 
 function updateSimulation(state: WorldState, step: number): void {
   simulationTime += step;
-  beacon.rotation.y += step * 0.18;
-  beacon.children[1].rotation.z -= step * 0.3;
-  beacon.children[2].rotation.z += step * 0.22;
+  beacon.rotation.y += step * 0.055;
+  if (beaconInnerRing) {
+    beaconInnerRing.rotation.z -= step * 0.12;
+  }
+  if (beaconOuterRing) {
+    beaconOuterRing.rotation.z += step * 0.08;
+  }
   rangeGrid.rotation.y += step * 0.006;
 
   for (const unit of state.units.values()) {
@@ -475,12 +495,12 @@ function renderPresentation(): void {
     view.group.rotation.y = unit.heading;
     view.selectionRing.visible = unit.selected && unit.owner === "player";
 
-    const thrusterPulse = 0.86 + Math.sin(simulationTime * 8) * 0.14;
+    const thrusterPulse = 0.94 + Math.sin(simulationTime * 8) * 0.06;
     for (const thruster of view.thrusterGlows) {
       thruster.scale.set(1, thrusterPulse, 1);
     }
 
-    const selectionPulse = 1 + Math.sin(simulationTime * 4) * 0.06;
+    const selectionPulse = 1 + Math.sin(simulationTime * 4) * 0.018;
     view.selectionRing.scale.setScalar(selectionPulse);
   }
 
@@ -941,122 +961,208 @@ function createShipView(unit: Unit): ShipView {
   group.userData.unitId = unit.id;
   group.scale.setScalar(shipClass.scale);
 
-  const factionColor = unit.owner === "player" ? 0x22d3ee : 0xf97316;
-  const accentColor = unit.owner === "player" ? 0x9be7f5 : 0xfde68a;
+  const factionColor = unit.owner === "player" ? 0x5ca7b2 : 0xb86e56;
+  const accentColor = unit.owner === "player" ? 0x8fcbd2 : 0xd7a188;
   const hullMaterial = new THREE.MeshStandardMaterial({
-    color: factionColor,
-    emissive: unit.owner === "player" ? 0x063b52 : 0x5b2108,
-    emissiveIntensity: 1.8,
-    metalness: 0.9,
-    roughness: 0.24,
+    color: unit.owner === "player" ? 0x202b31 : 0x322824,
+    emissive: unit.owner === "player" ? 0x020a0d : 0x0d0503,
+    emissiveIntensity: 0.22,
+    metalness: 0.76,
+    roughness: 0.46,
+    flatShading: true,
   });
-  const trimMaterial = new THREE.MeshStandardMaterial({
-    color: accentColor,
+  const armorMaterial = new THREE.MeshStandardMaterial({
+    color: unit.owner === "player" ? 0x35444a : 0x4a3933,
+    emissive: 0x030405,
+    emissiveIntensity: 0.08,
+    metalness: 0.84,
+    roughness: 0.34,
+    flatShading: true,
+  });
+  const panelMaterial = new THREE.MeshStandardMaterial({
+    color: unit.owner === "player" ? 0x10171b : 0x1a1412,
+    metalness: 0.68,
+    roughness: 0.58,
+  });
+  const accentMaterial = new THREE.MeshStandardMaterial({
+    color: factionColor,
     emissive: factionColor,
-    emissiveIntensity: 2.4,
-    metalness: 0.8,
-    roughness: 0.18,
+    emissiveIntensity: 0.62,
+    metalness: 0.48,
+    roughness: 0.32,
   });
   const engineMaterial = new THREE.MeshBasicMaterial({
     color: accentColor,
     transparent: true,
-    opacity: 0.86,
+    opacity: 0.72,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
 
   if (unit.classId === "scout") {
-    const hull = new THREE.Mesh(
-      new THREE.ConeGeometry(3.5, 11, 6),
-      hullMaterial,
-    );
-    hull.rotation.x = Math.PI / 2;
-    hull.scale.set(0.82, 0.58, 1.35);
+    const hull = new THREE.Mesh(createAngularHullGeometry(6.2, 13.5, 2.1), hullMaterial);
     group.add(hull);
 
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(9, 0.65, 2.6), hullMaterial);
-    wing.position.set(0, -0.55, -0.8);
-    wing.rotation.y = Math.PI / 12;
-    group.add(wing);
-
-    const cockpit = new THREE.Mesh(
-      new THREE.SphereGeometry(1.4, 18, 10),
-      trimMaterial,
+    const dorsalArmor = new THREE.Mesh(
+      createAngularHullGeometry(3.4, 7.8, 0.75),
+      armorMaterial,
     );
-    cockpit.position.set(0, 1.15, 1.7);
-    cockpit.scale.set(0.8, 0.55, 1.25);
-    group.add(cockpit);
+    dorsalArmor.position.set(0, 1.25, 0.45);
+    group.add(dorsalArmor);
+
+    for (const side of [-1, 1]) {
+      const wing = new THREE.Mesh(
+        new THREE.BoxGeometry(4.8, 0.46, 2.2),
+        armorMaterial,
+      );
+      wing.position.set(side * 3.5, -0.5, -1.2);
+      wing.rotation.y = side * -0.22;
+      group.add(wing);
+
+      const panelStrip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.12, 5.1),
+        accentMaterial,
+      );
+      panelStrip.position.set(side * 1.45, 1.47, -0.25);
+      group.add(panelStrip);
+    }
+
+    const sensor = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.62, 0),
+      accentMaterial,
+    );
+    sensor.position.set(0, 1.88, 3.1);
+    group.add(sensor);
   } else if (unit.classId === "striker") {
-    const hull = new THREE.Mesh(
-      new THREE.BoxGeometry(6.5, 2.8, 11),
-      hullMaterial,
-    );
-    hull.position.y = -0.2;
-    hull.rotation.y = Math.PI / 4;
+    const hull = new THREE.Mesh(createAngularHullGeometry(9.4, 15.2, 3.2), hullMaterial);
     group.add(hull);
 
-    const prow = new THREE.Mesh(
-      new THREE.ConeGeometry(2.8, 7, 4),
-      trimMaterial,
+    const prowArmor = new THREE.Mesh(
+      createAngularHullGeometry(5.2, 8.4, 1.05),
+      armorMaterial,
     );
-    prow.rotation.x = Math.PI / 2;
-    prow.position.z = 4.5;
-    prow.scale.set(0.72, 0.5, 1);
-    group.add(prow);
+    prowArmor.position.set(0, 2.0, 2.7);
+    group.add(prowArmor);
 
-    for (const x of [-3.7, 3.7]) {
+    for (const side of [-1, 1]) {
+      const armorPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(4.4, 0.72, 8.6),
+        armorMaterial,
+      );
+      armorPlate.position.set(side * 3.45, 0.7, -0.8);
+      armorPlate.rotation.y = side * 0.09;
+      group.add(armorPlate);
+
+      const gunMount = new THREE.Mesh(
+        new THREE.BoxGeometry(1.45, 1.0, 2.8),
+        panelMaterial,
+      );
+      gunMount.position.set(side * 3.55, 1.3, 3.25);
+      group.add(gunMount);
+
       const gun = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.4, 0.55, 4.8, 10),
-        trimMaterial,
+        new THREE.CylinderGeometry(0.2, 0.28, 4.8, 8),
+        accentMaterial,
       );
       gun.rotation.x = Math.PI / 2;
-      gun.position.set(x, 0.3, 1.2);
+      gun.position.set(side * 3.55, 1.45, 5.25);
       group.add(gun);
     }
-  } else {
-    const hull = new THREE.Mesh(
-      new THREE.CylinderGeometry(4.6, 5.8, 13, 8),
-      hullMaterial,
+
+    const centerStrip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, 0.16, 9.5),
+      accentMaterial,
     );
-    hull.rotation.x = Math.PI / 2;
+    centerStrip.position.set(0, 2.58, -0.4);
+    group.add(centerStrip);
+  } else {
+    const hull = new THREE.Mesh(createAngularHullGeometry(10.8, 20.5, 4.2), hullMaterial);
     group.add(hull);
 
-    const commandDeck = new THREE.Mesh(
-      new THREE.BoxGeometry(7.5, 2.2, 5.5),
-      trimMaterial,
+    const spine = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4, 2.2, 17.5),
+      armorMaterial,
     );
-    commandDeck.position.y = 2.1;
-    commandDeck.position.z = 0.8;
+    spine.position.set(0, 2.35, -0.4);
+    group.add(spine);
+
+    for (const side of [-1, 1]) {
+      const hangar = new THREE.Mesh(
+        new THREE.BoxGeometry(3.8, 2.8, 13.2),
+        armorMaterial,
+      );
+      hangar.position.set(side * 6.3, -0.35, -1.2);
+      hangar.rotation.y = side * 0.035;
+      group.add(hangar);
+
+      const hangarDoor = new THREE.Mesh(
+        new THREE.BoxGeometry(3.86, 0.18, 7.2),
+        panelMaterial,
+      );
+      hangarDoor.position.set(side * 6.3, 1.12, -0.9);
+      group.add(hangarDoor);
+
+      const registryStripe = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.16, 10.5),
+        accentMaterial,
+      );
+      registryStripe.position.set(side * 4.95, 2.25, -0.4);
+      group.add(registryStripe);
+    }
+
+    const commandDeck = new THREE.Mesh(
+      new THREE.BoxGeometry(4.6, 2.1, 5.2),
+      panelMaterial,
+    );
+    commandDeck.position.set(0, 4.35, 1.45);
     group.add(commandDeck);
 
-    const spine = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 3.5, 16),
-      hullMaterial,
+    const bridgeLight = new THREE.Mesh(
+      new THREE.BoxGeometry(3.2, 0.18, 0.34),
+      accentMaterial,
     );
-    spine.position.y = 1.3;
-    group.add(spine);
+    bridgeLight.position.set(0, 4.8, 4.05);
+    group.add(bridgeLight);
+
+    const antenna = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.18, 3.4, 8),
+      armorMaterial,
+    );
+    antenna.position.set(0, 6.7, 0.8);
+    group.add(antenna);
   }
 
   const thrusterGlows: THREE.Mesh[] = [];
   const thrusterCount = unit.classId === "carrier" ? 3 : 2;
+  const thrusterSpacing = unit.classId === "carrier" ? 3.1 : 2.25;
+  const thrusterZ = unit.classId === "carrier" ? -9.6 : unit.classId === "striker" ? -7.2 : -6.1;
   for (let index = 0; index < thrusterCount; index += 1) {
-    const x = (index - (thrusterCount - 1) / 2) * 2.1;
+    const x = (index - (thrusterCount - 1) / 2) * thrusterSpacing;
+    const housing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.72, 0.95, 2.5, 10),
+      panelMaterial,
+    );
+    housing.rotation.x = Math.PI / 2;
+    housing.position.set(x, -0.3, thrusterZ + 0.8);
+    group.add(housing);
+
     const thruster = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.65, 0.92, 3.4, 12),
+      new THREE.CylinderGeometry(0.38, 0.72, 2.2, 10),
       engineMaterial,
     );
     thruster.rotation.x = Math.PI / 2;
-    thruster.position.set(x, -0.35, -5.2);
+    thruster.position.set(x, -0.3, thrusterZ - 0.8);
     group.add(thruster);
     thrusterGlows.push(thruster);
   }
 
+  const ringRadius = unit.classId === "carrier" ? 9.1 : unit.classId === "striker" ? 7.1 : 5.8;
   const selectionRing = new THREE.Mesh(
-    new THREE.RingGeometry(4.7, 5.05, 48),
+    new THREE.RingGeometry(ringRadius, ringRadius + 0.14, 64, 1, 0.22, Math.PI * 1.58),
     new THREE.MeshBasicMaterial({
       color: factionColor,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.55,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -1067,13 +1173,42 @@ function createShipView(unit: Unit): ShipView {
   selectionRing.visible = false;
   group.add(selectionRing);
 
-  const shipLight = new THREE.PointLight(factionColor, 16, 42, 2);
-  shipLight.position.set(0, 0.5, 0);
+  const shipLight = new THREE.PointLight(factionColor, 3.5, 24, 2);
+  shipLight.position.set(0, 0.8, -2);
   group.add(shipLight);
 
   group.position.set(unit.position.x, unit.position.y, unit.position.z);
   group.rotation.y = unit.heading;
   return { group, selectionRing, thrusterGlows };
+}
+
+function createAngularHullGeometry(
+  width: number,
+  length: number,
+  height: number,
+): THREE.ExtrudeGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, length * 0.5);
+  shape.lineTo(width * 0.32, length * 0.2);
+  shape.lineTo(width * 0.5, -length * 0.22);
+  shape.lineTo(width * 0.3, -length * 0.5);
+  shape.lineTo(-width * 0.3, -length * 0.5);
+  shape.lineTo(-width * 0.5, -length * 0.22);
+  shape.lineTo(-width * 0.32, length * 0.2);
+  shape.closePath();
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: height,
+    steps: 1,
+    bevelEnabled: true,
+    bevelSegments: 1,
+    bevelSize: 0.16,
+    bevelThickness: 0.18,
+  });
+  geometry.center();
+  geometry.rotateX(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function createAttackEffect(attacker: Unit, target: Unit): void {
@@ -1082,9 +1217,9 @@ function createAttackEffect(attacker: Unit, target: Unit): void {
     new THREE.Vector3(target.position.x, target.position.y, target.position.z),
   ]);
   const material = new THREE.LineBasicMaterial({
-    color: attacker.owner === "player" ? 0x67e8f9 : 0xfb923c,
+    color: attacker.owner === "player" ? 0x8fcbd2 : 0xd7a188,
     transparent: true,
-    opacity: 0.96,
+    opacity: 0.82,
     blending: THREE.AdditiveBlending,
   });
   const line = new THREE.Line(geometry, material);
@@ -1099,11 +1234,11 @@ function createAttackEffect(attacker: Unit, target: Unit): void {
 }
 
 function createImpactEffect(unit: Unit): void {
-  const geometry = new THREE.SphereGeometry(2.8, 16, 10);
+  const geometry = new THREE.IcosahedronGeometry(2.35, 1);
   const material = new THREE.MeshBasicMaterial({
-    color: unit.owner === "player" ? 0x67e8f9 : 0xfb923c,
+    color: unit.owner === "player" ? 0x8fcbd2 : 0xd7a188,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.76,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -1133,11 +1268,11 @@ function createTargetMarker(): THREE.Group {
   marker.name = "combat-target-marker";
 
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(2.3, 2.6, 32),
+    new THREE.RingGeometry(3.05, 3.2, 48, 1, 0.15, Math.PI * 1.55),
     new THREE.MeshBasicMaterial({
-      color: 0xfbbf24,
+      color: 0xc99a69,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.68,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -1146,58 +1281,112 @@ function createTargetMarker(): THREE.Group {
   ring.rotation.x = -Math.PI / 2;
   marker.add(ring);
 
-  const core = new THREE.Mesh(
-    new THREE.SphereGeometry(0.42, 12, 8),
-    new THREE.MeshBasicMaterial({
-      color: 0xfef3c7,
-      transparent: true,
-      opacity: 0.92,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
+  const bracketMaterial = new THREE.MeshBasicMaterial({
+    color: 0xd9b48a,
+    transparent: true,
+    opacity: 0.7,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const horizontal = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8, 0.08, 0.08),
+    bracketMaterial,
   );
-  core.position.y = 0.35;
-  marker.add(core);
+  horizontal.position.y = 0.08;
+  marker.add(horizontal);
+
+  const vertical = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.08, 1.8),
+    bracketMaterial,
+  );
+  vertical.position.y = 0.08;
+  marker.add(vertical);
   return marker;
 }
 
 function createNavigationBeacon(): THREE.Group {
   const group = new THREE.Group();
-  group.position.set(0, -5, 0);
+  group.position.set(2, GROUND_Y + 0.4, -4);
 
-  const coreMaterial = new THREE.MeshStandardMaterial({
-    color: 0x164e63,
-    emissive: 0x0891b2,
-    emissiveIntensity: 2.8,
-    metalness: 0.85,
-    roughness: 0.24,
+  const structureMaterial = new THREE.MeshStandardMaterial({
+    color: 0x253137,
+    emissive: 0x030708,
+    emissiveIntensity: 0.12,
+    metalness: 0.78,
+    roughness: 0.48,
+    flatShading: true,
   });
-  const core = new THREE.Mesh(new THREE.IcosahedronGeometry(7, 2), coreMaterial);
+  const panelMaterial = new THREE.MeshStandardMaterial({
+    color: 0x11191d,
+    metalness: 0.62,
+    roughness: 0.64,
+  });
+
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.7, 3.4, 1.4, 8),
+    structureMaterial,
+  );
+  base.position.y = 0.7;
+  group.add(base);
+
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.72, 7.5, 8),
+    structureMaterial,
+  );
+  mast.position.y = 4.8;
+  group.add(mast);
+
+  const core = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.82, 0),
+    new THREE.MeshStandardMaterial({
+      color: 0x78959d,
+      emissive: 0x547c86,
+      emissiveIntensity: 0.9,
+      metalness: 0.54,
+      roughness: 0.36,
+    }),
+  );
+  core.position.y = 8.7;
   group.add(core);
 
+  for (const side of [-1, 1]) {
+    const stabilizer = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 0.35, 0.8),
+      panelMaterial,
+    );
+    stabilizer.position.set(side * 2.2, 1.5, 0);
+    stabilizer.rotation.z = side * 0.2;
+    group.add(stabilizer);
+  }
+
   const ringMaterial = new THREE.MeshBasicMaterial({
-    color: 0x67e8f9,
+    color: 0x76949c,
     transparent: true,
-    opacity: 0.72,
+    opacity: 0.28,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const innerRing = new THREE.Mesh(
-    new THREE.TorusGeometry(14, 0.22, 8, 96),
+    new THREE.TorusGeometry(3.2, 0.045, 6, 64),
     ringMaterial,
   );
-  innerRing.rotation.x = Math.PI / 2.8;
+  innerRing.name = "beacon-inner-ring";
+  innerRing.position.y = 5.2;
+  innerRing.rotation.x = Math.PI / 2.35;
   group.add(innerRing);
 
   const outerRing = new THREE.Mesh(
-    new THREE.TorusGeometry(24, 0.12, 8, 128),
+    new THREE.TorusGeometry(5.1, 0.035, 6, 72),
     ringMaterial.clone(),
   );
-  outerRing.rotation.x = -Math.PI / 3.2;
+  outerRing.name = "beacon-outer-ring";
+  outerRing.position.y = 4.2;
+  outerRing.rotation.x = -Math.PI / 3.1;
   group.add(outerRing);
 
-  const beaconLight = new THREE.PointLight(0x22d3ee, 95, 180, 2);
+  const beaconLight = new THREE.PointLight(0x6f99a3, 7, 36, 2);
+  beaconLight.position.y = 8.4;
   group.add(beaconLight);
   return group;
 }
@@ -1221,8 +1410,8 @@ function createStarfield(
     positions[offset + 1] = radius * Math.cos(phi);
     positions[offset + 2] = radius * sinPhi * Math.sin(theta);
 
-    const hue = 0.52 + nextRandom() * 0.12;
-    color.setHSL(hue, 0.55, 0.55 + nextRandom() * 0.35);
+    const hue = 0.53 + nextRandom() * 0.09;
+    color.setHSL(hue, 0.22, 0.48 + nextRandom() * 0.42);
     colors[offset] = color.r;
     colors[offset + 1] = color.g;
     colors[offset + 2] = color.b;
@@ -1233,15 +1422,100 @@ function createStarfield(
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
   const material = new THREE.PointsMaterial({
-    size: 2.2,
+    size: 1.45,
     sizeAttenuation: true,
     transparent: true,
-    opacity: 0.86,
+    opacity: 0.72,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     vertexColors: true,
   });
   return new THREE.Points(geometry, material);
+}
+
+function createSpaceDust(
+  nextRandom: () => number,
+  count: number,
+): THREE.Points {
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const color = new THREE.Color();
+
+  for (let index = 0; index < count; index += 1) {
+    const offset = index * 3;
+    positions[offset] = -260 + nextRandom() * 520;
+    positions[offset + 1] = -90 + nextRandom() * 210;
+    positions[offset + 2] = -260 - nextRandom() * 520;
+    color.setHSL(0.54 + nextRandom() * 0.06, 0.18, 0.22 + nextRandom() * 0.16);
+    colors[offset] = color.r;
+    colors[offset + 1] = color.g;
+    colors[offset + 2] = color.b;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const material = new THREE.PointsMaterial({
+    size: 46,
+    map: createSoftParticleTexture(),
+    transparent: true,
+    opacity: 0.075,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexColors: true,
+  });
+  return new THREE.Points(geometry, material);
+}
+
+function createSoftParticleTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gradient.addColorStop(0, "rgba(255, 255, 255, 0.8)");
+  gradient.addColorStop(0.34, "rgba(255, 255, 255, 0.2)");
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 64, 64);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createDistantPlanet(): THREE.Group {
+  const group = new THREE.Group();
+  group.position.set(190, 42, -620);
+
+  const planet = new THREE.Mesh(
+    new THREE.SphereGeometry(92, 32, 20),
+    new THREE.MeshStandardMaterial({
+      color: 0x101820,
+      emissive: 0x030609,
+      emissiveIntensity: 0.18,
+      metalness: 0.02,
+      roughness: 0.98,
+    }),
+  );
+  group.add(planet);
+
+  const atmosphere = new THREE.Mesh(
+    new THREE.SphereGeometry(95, 32, 20),
+    new THREE.MeshBasicMaterial({
+      color: 0x35515f,
+      transparent: true,
+      opacity: 0.09,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false,
+    }),
+  );
+  group.add(atmosphere);
+  return group;
 }
 
 function createSeededRandom(seed: number): () => number {
