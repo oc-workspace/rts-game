@@ -2,6 +2,6 @@ node_modules/
 dist/
 build/
 .cache/
+.env
 .DS_Store
 *.log
-

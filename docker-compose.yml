@@ -1,0 +1,11 @@
+name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required}
+
+services:
+  rts-game:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${APP_IMAGE:?APP_IMAGE is required}
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3109}:80"

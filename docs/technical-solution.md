@@ -42,6 +42,14 @@ cd /work/oc-projects/rts-game
 - 生产发布不在 dev 目录直接完成；需要通过 rococo-root 的隔离目录和 oc-prod-release 发布到 oWinnieo/rts-game。
 - 远程 dev 和生产仓库的当前状态、提交和构建结果以服务器检查为准，本地文件不视为已提交变更。
 
+### 3.1 预览部署
+
+- netcup1 上的预览检出目录为 `/opt/docker/oc-projects/rts-game`，不承担日常开发职责。
+- 项目使用独立 `docker-compose.yml` 和多阶段 `Dockerfile`：构建阶段运行 `npm ci` 与 `npm run build`，运行阶段使用 Nginx 提供 `dist` 静态文件。
+- 容器通过宿主机 `3109` 端口暴露，统一由 `/opt/docker/rococo` 中的共享 Nginx 代理到 `https://rts-game-dev.rococo.dev`。
+- 共享 Nginx 使用现有 `rococo.dev` 通配证书；预览域名无需在项目容器中处理 TLS。
+- 预览部署用于 dev 构建验收，不替代 `oc-prod-release` 生产发布流程。
+
 ## 4. 总体架构
 
 ~~~text

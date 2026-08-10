@@ -251,3 +251,7 @@ cd /work/oc-projects/rts-game
 ### 发布风险
 
 dev 是日常开发源，prod 是经过隔离流程的发布仓库。禁止直接在 prod main 上修改文件；后续生产变化必须从 dev 拉取并使用 oc-prod-release。
+
+### 预览环境风险
+
+netcup1 的 `rts-game-dev.rococo.dev` 只用于 dev 构建验收。项目容器和共享 Nginx 配置分别由项目 Compose 与 `/opt/docker/rococo` 管理；每次变更必须先通过容器构建、Nginx 配置检查和浏览器 smoke test，再记录到日期进度日志。
