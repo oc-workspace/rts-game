@@ -144,11 +144,87 @@ h1 {
 
 .hint {
   margin-left: auto;
+  max-width: min(46rem, 52vw);
   color: #64748b;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.58rem;
   letter-spacing: 0.08em;
   text-align: right;
+}
+
+.unit-card {
+  position: absolute;
+  z-index: 2;
+  top: clamp(7rem, 14vh, 9.5rem);
+  left: clamp(1.25rem, 4vw, 3rem);
+  width: min(22rem, calc(100% - 2.5rem));
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(103, 232, 249, 0.32);
+  border-left: 2px solid #67e8f9;
+  background: linear-gradient(135deg, rgba(8, 47, 73, 0.82), rgba(2, 6, 23, 0.74));
+  box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.24), inset 0 0 2rem rgba(34, 211, 238, 0.06);
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.unit-card__eyebrow {
+  color: #67e8f9;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.unit-card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.45rem;
+}
+
+.unit-card__header strong {
+  color: #f8fafc;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+}
+
+.unit-card__header span {
+  color: #bae6fd;
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-align: right;
+}
+
+.unit-card__metrics {
+  display: grid;
+  grid-template-columns: 0.6fr 1.4fr;
+  gap: 1rem;
+  margin-top: 0.85rem;
+}
+
+.unit-card__metrics div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.unit-card__metrics span {
+  color: #64748b;
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.unit-card__metrics strong {
+  overflow: hidden;
+  color: #e0f2fe;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fatal-error {
@@ -192,7 +268,12 @@ h1 {
 
   .hint {
     grid-column: 1 / -1;
+    max-width: none;
     margin-left: 0;
     text-align: left;
+  }
+
+  .unit-card {
+    top: 8.5rem;
   }
 }
