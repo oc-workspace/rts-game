@@ -66,6 +66,7 @@ interface WorldState {
   lastOrder: MoveOrder | AttackOrder | null;
   statusMessage: string;
   winner: Faction | null;
+  playerHasEngaged: boolean;
 }
 
 interface ShipView {
@@ -88,10 +89,10 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     name: "AURORA SCOUT",
     role: "LIGHT RECON",
     speed: 18,
-    maxHealth: 80,
-    weaponRange: 34,
-    damage: 9,
-    cooldown: 0.65,
+    maxHealth: 140,
+    weaponRange: 42,
+    damage: 16,
+    cooldown: 0.7,
     scale: 0.8,
   },
   striker: {
@@ -99,10 +100,10 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     name: "EMBER STRIKER",
     role: "LINE COMBAT",
     speed: 12,
-    maxHealth: 120,
-    weaponRange: 38,
-    damage: 14,
-    cooldown: 0.9,
+    maxHealth: 110,
+    weaponRange: 34,
+    damage: 8,
+    cooldown: 1.1,
     scale: 1,
   },
   carrier: {
@@ -110,10 +111,10 @@ const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
     name: "BASTION CARRIER",
     role: "HEAVY COMMAND",
     speed: 8,
-    maxHealth: 200,
-    weaponRange: 46,
-    damage: 20,
-    cooldown: 1.4,
+    maxHealth: 180,
+    weaponRange: 42,
+    damage: 12,
+    cooldown: 1.6,
     scale: 1.25,
   },
 };
@@ -343,6 +344,12 @@ function updatePlayerBehavior(state: WorldState, unit: Unit, step: number): void
 }
 
 function updateEnemyBehavior(state: WorldState, unit: Unit, step: number): void {
+  if (!state.playerHasEngaged && unit.health >= getShipClass(unit).maxHealth) {
+    unit.targetUnitId = null;
+    unit.state = "idle";
+    return;
+  }
+
   const target = findNearestLivingUnit(state, "player", unit.position);
   if (!target) {
     unit.state = "idle";
@@ -737,6 +744,7 @@ function issueAttackOrder(targetId: string): void {
   };
   world.lastOrder = order;
   world.aimedTargetId = null;
+  world.playerHasEngaged = true;
   world.statusMessage = "ATTACK ORDER · " + targetId.toUpperCase();
 
   for (const unitId of selectedIds) {
@@ -856,6 +864,7 @@ function resetEncounter(): void {
   world.winner = null;
   world.lastOrder = null;
   world.aimedTargetId = null;
+  world.playerHasEngaged = false;
 
   for (const initialUnit of createInitialUnits()) {
     const unit = world.units.get(initialUnit.id);
@@ -886,6 +895,7 @@ function createWorldState(): WorldState {
     lastOrder: null,
     statusMessage: "SELECT A PLAYER UNIT",
     winner: null,
+    playerHasEngaged: false,
   };
 }
 
