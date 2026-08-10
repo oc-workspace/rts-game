@@ -121,6 +121,8 @@ cd /work/oc-projects/rts-game
 
 ### P4：随机模式与 HUD
 
+当前进度：P4.1 已完成 deterministic random、随机舰队生成、编队出生点、中立小行星、战场边界和 seed 展示；多选/编组/队列指令、单位列表和小地图仍待后续子阶段完成。
+
 任务顺序：
 
 1. 建立 deterministic random 工具；
@@ -136,6 +138,8 @@ cd /work/oc-projects/rts-game
 - 不同 seed 能产生可玩而非空白或越界的遭遇；
 - 多选单位能够发出一次共享指令；
 - HUD 的数值和选中状态与 simulation 一致。
+
+P4.1 的已验收范围：相同 URL seed 会生成相同的双方舰队规模和初始遭遇；不同 seed 会产生不同的 `3V4`/`4V3` 等可运行规模；中立小行星会进入场景并进行低速旋转；超出战场边界的移动指令会被限制。
 
 ### P5：视觉表现
 
