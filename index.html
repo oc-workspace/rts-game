@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#020617" />
+    <title>RTS Game // P1 Engineering Skeleton</title>
+  </head>
+  <body>
+    <main id="app" aria-label="RTS game viewport">
+      <section class="hud hud--top" aria-label="Runtime status">
+        <div>
+          <p class="eyebrow">RTS GAME // P1 ENGINEERING SKELETON</p>
+          <h1>DEEP SPACE TEST RANGE</h1>
+        </div>
+        <div class="status-cluster">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="runtime-status">INITIALIZING</span>
+        </div>
+      </section>
+
+      <section class="hud hud--bottom" aria-label="Simulation telemetry">
+        <div class="telemetry">
+          <span class="telemetry__label">SEED</span>
+          <strong id="seed-value">RTS-P1-001</strong>
+        </div>
+        <div class="telemetry">
+          <span class="telemetry__label">SIMULATION</span>
+          <strong id="simulation-status">BOOTING</strong>
+        </div>
+        <div class="telemetry">
+          <span class="telemetry__label">ACTIVE UNITS</span>
+          <strong id="unit-count">0</strong>
+        </div>
+        <div class="telemetry">
+          <span class="telemetry__label">FPS</span>
+          <strong id="fps-value">--</strong>
+        </div>
+        <p class="hint">R RESET CAMERA · P PAUSE</p>
+      </section>
+
+      <section id="fatal-error" class="fatal-error" hidden role="alert">
+        <p class="eyebrow">RENDERER ERROR</p>
+        <h2>无法启动 3D 视图</h2>
+        <p id="fatal-error-message">当前浏览器或 GPU 不支持所需的 WebGL 能力。</p>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -27,7 +27,22 @@
 
 具体包版本在初始化脚手架时读取官方当前稳定版本，并写入 lockfile；本方案不提前锁死未经验证的版本号。
 
-## 3. 总体架构
+## 3. 开发环境与文件流
+
+按照 OpenClaw 项目规范，正式 dev 工作区位于远程开发服务器：
+
+~~~text
+ssh rococo-oc-workplace
+cd /work/oc-projects/rts-game
+~~~
+
+- 远程 /work/oc-projects/rts-game 是 dev 仓库的实际工作目录和提交源头。
+- 本地 /Users/ryuuna/Documents/GitHub/project-for-future/rts-game 是协作工作区，用于准备文件、检查文档和通过 SCP 同步到远程。
+- 日常变更在远程工作区使用 oc-push 提交并推送到 oc-workspace/rts-game。
+- 生产发布不在 dev 目录直接完成；需要通过 rococo-root 的隔离目录和 oc-prod-release 发布到 oWinnieo/rts-game。
+- 远程 dev 和生产仓库的当前状态、提交和构建结果以服务器检查为准，本地文件不视为已提交变更。
+
+## 4. 总体架构
 
 ~~~text
 App Shell
@@ -61,7 +76,7 @@ Verification
   └─ screenshot / visual regression notes
 ~~~
 
-## 4. 模块边界
+## 5. 模块边界
 
 ### 4.1 App Shell
 
@@ -122,7 +137,7 @@ UI 不直接修改单位对象，而是：
 3. 等待 Simulation 更新；
 4. 根据新状态刷新显示。
 
-## 5. 游戏循环与时间模型
+## 6. 游戏循环与时间模型
 
 采用固定步长模拟与可变帧率渲染：
 
@@ -139,7 +154,7 @@ ui.render(viewModel)
 
 建议第一版固定步长从 1/60 秒开始，并将最大补偿步数设上限，避免浏览器切后台后出现 spiral of death。渲染可以使用插值，让单位视觉位置平滑但不改变模拟结果。
 
-## 6. 渲染与视觉方案
+## 7. 渲染与视觉方案
 
 ### 6.1 太空场景
 
@@ -169,7 +184,7 @@ ui.render(viewModel)
 
 特效必须有生命周期、对象池和数量上限。禁止在每个粒子或每帧路径中无界创建 GPU/CPU 对象。
 
-## 7. 性能策略
+## 8. 性能策略
 
 性能目标按阶段验证，不把目标当成完成结论：
 
@@ -196,7 +211,7 @@ ui.render(viewModel)
 4. 使用实例化和 LOD；
 5. 最后再增加 Shader 和后处理复杂度。
 
-## 8. 随机模式方案
+## 9. 随机模式方案
 
 随机模式必须可复现。每局保存一个 seed，并由 seed 决定：
 
@@ -208,7 +223,7 @@ ui.render(viewModel)
 
 随机生成器不能直接调用不可控的全局随机函数。所有生成结果通过 Encounter 配置输出，便于测试、分享和复盘。
 
-## 9. 验证方案
+## 10. 验证方案
 
 ### 逻辑验证
 
@@ -234,7 +249,7 @@ ui.render(viewModel)
 - 检查特效关闭/低画质模式是否正确降级；
 - 记录问题、复现步骤和修复提交。
 
-## 10. 风险与降级策略
+## 11. 风险与降级策略
 
 | 风险 | 影响 | 降级策略 |
 | --- | --- | --- |
@@ -245,7 +260,7 @@ ui.render(viewModel)
 | 规则和渲染耦合 | 难以测试和扩展 | Simulation 不引用 Three.js 对象 |
 | 生产发布漂移 | dev/prod 内容不一致 | 仅通过 oc-prod-release 和 PR 发布后续变更 |
 
-## 11. 技术方案的完成标准
+## 12. 技术方案的完成标准
 
 当一个技术阶段满足以下条件，才算完成：
 
@@ -255,4 +270,3 @@ ui.render(viewModel)
 - 有至少一个固定 seed 的视觉验证结果；
 - 有性能数据或明确说明为什么当前阶段暂不测量；
 - 已记录已知限制和下一步。
-
