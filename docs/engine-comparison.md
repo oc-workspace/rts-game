@@ -96,7 +96,6 @@ Three.js 战场层
 - [Three.js Manual](https://threejs.org/manual/)
 - [Three.js API 文档](https://threejs.org/docs/)
 - [PixiJS 官方网站与文档](https://pixijs.com/)
-- [Phaser 3 官方页面](https://phaser.io/phaser3)
+- [Phaser 官方文档：What is Phaser?](https://docs.phaser.io/phaser/getting-started/what-is-phaser)
 - [Phaser 4 官方页面](https://phaser.io/phaser4)
 - [Phaser 官方 GitHub 仓库](https://github.com/phaserjs/phaser)
-
