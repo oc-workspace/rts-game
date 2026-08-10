@@ -189,7 +189,7 @@ const rimLight = new THREE.DirectionalLight(0x527b91, 3.1);
 rimLight.position.set(110, 24, -120);
 scene.add(rimLight);
 
-const warmFill = new THREE.DirectionalLight(0x7c5546, 1.4);
+const warmFill = new THREE.DirectionalLight(0x8b756c, 1.0);
 warmFill.position.set(-70, 8, -80);
 scene.add(warmFill);
 
@@ -962,18 +962,18 @@ function createShipView(unit: Unit): ShipView {
   group.userData.unitId = unit.id;
   group.scale.setScalar(shipClass.scale);
 
-  const factionColor = unit.owner === "player" ? 0x5ca7b2 : 0xb86e56;
-  const accentColor = unit.owner === "player" ? 0x8fcbd2 : 0xd7a188;
+  const factionColor = unit.owner === "player" ? 0x5ca7b2 : 0xa45748;
+  const accentColor = unit.owner === "player" ? 0x83c1ca : 0xcf7157;
   const hullMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x3a484d : 0x4d3a34,
-    emissive: unit.owner === "player" ? 0x020a0d : 0x0d0503,
+    color: unit.owner === "player" ? 0x3a484d : 0x41413f,
+    emissive: unit.owner === "player" ? 0x020a0d : 0x090302,
     emissiveIntensity: 0.28,
     metalness: 0.62,
     roughness: 0.5,
     flatShading: true,
   });
   const armorMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x52636a : 0x665047,
+    color: unit.owner === "player" ? 0x52636a : 0x5b5956,
     emissive: 0x030405,
     emissiveIntensity: 0.12,
     metalness: 0.7,
@@ -981,7 +981,7 @@ function createShipView(unit: Unit): ShipView {
     flatShading: true,
   });
   const panelMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x1d272c : 0x2a201d,
+    color: unit.owner === "player" ? 0x1d272c : 0x242322,
     metalness: 0.58,
     roughness: 0.62,
   });
@@ -1047,7 +1047,7 @@ function createShipView(unit: Unit): ShipView {
 
     for (const side of [-1, 1]) {
       const armorPlate = new THREE.Mesh(
-        new THREE.BoxGeometry(4.4, 0.72, 8.6),
+        createAngularHullGeometry(4.4, 8.6, 0.72),
         armorMaterial,
       );
       armorPlate.position.set(side * 3.45, 0.7, -0.8);
@@ -1055,7 +1055,7 @@ function createShipView(unit: Unit): ShipView {
       group.add(armorPlate);
 
       const gunMount = new THREE.Mesh(
-        new THREE.BoxGeometry(1.45, 1.0, 2.8),
+        new THREE.CylinderGeometry(0.9, 1.15, 1.0, 6),
         panelMaterial,
       );
       gunMount.position.set(side * 3.55, 1.3, 3.25);
@@ -1063,11 +1063,19 @@ function createShipView(unit: Unit): ShipView {
 
       const gun = new THREE.Mesh(
         new THREE.CylinderGeometry(0.2, 0.28, 4.8, 8),
-        accentMaterial,
+        panelMaterial,
       );
       gun.rotation.x = Math.PI / 2;
       gun.position.set(side * 3.55, 1.45, 5.25);
       group.add(gun);
+
+      const muzzle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.24, 0.2, 8),
+        accentMaterial,
+      );
+      muzzle.rotation.x = Math.PI / 2;
+      muzzle.position.set(side * 3.55, 1.45, 7.66);
+      group.add(muzzle);
     }
 
     const centerStrip = new THREE.Mesh(
@@ -1089,7 +1097,7 @@ function createShipView(unit: Unit): ShipView {
 
     for (const side of [-1, 1]) {
       const hangar = new THREE.Mesh(
-        new THREE.BoxGeometry(3.8, 2.8, 13.2),
+        createAngularHullGeometry(3.8, 13.2, 2.8),
         armorMaterial,
       );
       hangar.position.set(side * 6.3, -0.35, -1.2);
@@ -1112,7 +1120,7 @@ function createShipView(unit: Unit): ShipView {
     }
 
     const commandDeck = new THREE.Mesh(
-      new THREE.BoxGeometry(4.6, 2.1, 5.2),
+      createAngularHullGeometry(4.6, 5.2, 2.1),
       panelMaterial,
     );
     commandDeck.position.set(0, 4.35, 1.45);
