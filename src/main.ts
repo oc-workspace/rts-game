@@ -284,6 +284,7 @@ let selectionStartX = 0;
 let selectionStartY = 0;
 let selectionEndX = 0;
 let selectionEndY = 0;
+let lastTacticalHudUpdate = 0;
 
 runtimeStatus.textContent = "SYSTEM ONLINE";
 simulationStatus.textContent = "RUNNING";
@@ -635,8 +636,11 @@ function updateTelemetry(now: number): void {
       : "RUNNING";
   runtimeStatus.textContent =
     "SYSTEM ONLINE · T+" + simulationTime.toFixed(1).padStart(6, "0");
-  updateFleetHud();
-  updateMinimap();
+  if (now - lastTacticalHudUpdate >= 100) {
+    lastTacticalHudUpdate = now;
+    updateFleetHud();
+    updateMinimap();
+  }
 }
 
 function updateFleetHud(): void {
