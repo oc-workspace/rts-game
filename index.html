@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#020617" />
-    <title>RTS Game // P2 Single Ship Command</title>
+    <title>RTS Game // P3 Combat Range</title>
   </head>
   <body>
     <main id="app" aria-label="RTS game viewport">
       <section class="hud hud--top" aria-label="Runtime status">
         <div>
-          <p class="eyebrow">RTS GAME // P2 SINGLE SHIP COMMAND</p>
+          <p class="eyebrow">RTS GAME // P3 COMBAT RANGE</p>
           <h1>DEEP SPACE TEST RANGE</h1>
         </div>
         <div class="status-cluster">
@@ -22,7 +22,7 @@
       <section class="hud hud--bottom" aria-label="Simulation telemetry">
         <div class="telemetry">
           <span class="telemetry__label">SEED</span>
-          <strong id="seed-value">RTS-P1-001</strong>
+          <strong id="seed-value">RTS-P3-001</strong>
         </div>
         <div class="telemetry">
           <span class="telemetry__label">SIMULATION</span>
@@ -36,7 +36,7 @@
           <span class="telemetry__label">FPS</span>
           <strong id="fps-value">--</strong>
         </div>
-        <p class="hint">LMB SELECT · RMB MOVE · WHEEL ZOOM · MMB PAN · R RESET · N RESTART · P PAUSE</p>
+        <p class="hint">LMB SELECT · RMB MOVE/ATTACK · S STOP · WHEEL ZOOM · MMB PAN · R RESET · N RESTART · P PAUSE</p>
       </section>
 
       <section id="unit-card" class="unit-card" hidden aria-label="Selected unit status">
@@ -49,6 +49,14 @@
           <div>
             <span>HULL</span>
             <strong id="selected-unit-health">100 / 100</strong>
+          </div>
+          <div>
+            <span>TARGET</span>
+            <strong id="selected-unit-target">NONE</strong>
+          </div>
+          <div>
+            <span>WEAPON</span>
+            <strong id="selected-unit-weapon">READY</strong>
           </div>
           <div>
             <span>ORDER</span>
