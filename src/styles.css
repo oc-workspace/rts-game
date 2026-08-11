@@ -226,7 +226,7 @@ h1 {
 }
 
 .battle-log-panel {
-  top: 17.2rem;
+  top: 19.4rem;
   max-height: 12.5rem;
   padding: 0.7rem 0.8rem;
   overflow: hidden;
@@ -286,6 +286,74 @@ h1 {
   margin-top: 0.45rem;
   color: #62777d;
   font: 500 0.44rem/1.4 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.08em;
+}
+
+.effects-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid rgba(95, 118, 125, 0.14);
+  color: #53676d;
+  font: 700 0.43rem/1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.12em;
+}
+
+.effects-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-height: 1.25rem;
+  color: #91a9af;
+  cursor: pointer;
+}
+
+.effects-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.effects-switch__track {
+  position: relative;
+  width: 1.72rem;
+  height: 0.82rem;
+  border: 1px solid rgba(108, 146, 155, 0.34);
+  background: rgba(8, 15, 18, 0.9);
+}
+
+.effects-switch__track::after {
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 0.46rem;
+  height: 0.46rem;
+  background: #6c7779;
+  content: "";
+  transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.effects-switch input:checked + .effects-switch__track::after {
+  background: #76b5be;
+  box-shadow: 0 0 0.45rem rgba(92, 167, 178, 0.48);
+  transform: translateX(0.86rem);
+}
+
+.effects-switch input:focus-visible + .effects-switch__track {
+  border-color: rgba(118, 181, 190, 0.82);
+  outline: 1px solid rgba(118, 181, 190, 0.28);
+  outline-offset: 2px;
+}
+
+.effects-switch strong {
+  min-width: 2.2rem;
+  color: #9eb7bd;
+  font-size: 0.45rem;
+  font-weight: 600;
   letter-spacing: 0.08em;
 }
 
@@ -608,7 +676,7 @@ h1 {
   }
 
   .fleet-panel {
-    top: 17.2rem;
+    top: 19.4rem;
     right: 1rem;
     width: calc(100% - 2rem);
   }

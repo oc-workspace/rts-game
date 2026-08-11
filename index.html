@@ -10,7 +10,7 @@
     <main id="app" aria-label="RTS game viewport">
       <section class="hud hud--top" aria-label="Runtime status">
         <div>
-          <p class="eyebrow">RTS GAME // P4.3 ENCOUNTER CONTROL</p>
+          <p class="eyebrow">RTS GAME // P5 VISUAL SYSTEMS</p>
           <h1>KHEPRI RANDOM ENCOUNTER</h1>
         </div>
         <div class="status-cluster">
@@ -52,6 +52,14 @@
           <button id="copy-seed" type="button">COPY LINK</button>
           <button id="restart-encounter" type="button">RESTART</button>
           <button id="new-encounter" type="button">NEW SEED</button>
+        </div>
+        <div class="effects-control">
+          <span>VISUAL EFFECTS</span>
+          <label class="effects-switch">
+            <input id="effects-quality" type="checkbox" checked />
+            <span class="effects-switch__track" aria-hidden="true"></span>
+            <strong id="effects-quality-value">HIGH</strong>
+          </label>
         </div>
         <p id="seed-action-status" class="seed-action-status" aria-live="polite">LINK READY</p>
         <dl class="encounter-metrics">

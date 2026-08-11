@@ -24,16 +24,15 @@ import type {
   Vec3,
   WorldState,
 } from "./game/types";
+import {
+  createShipVisual,
+  updateShipVisual,
+} from "./render/ship-visuals";
+import type { EffectsQuality, ShipView } from "./render/ship-visuals";
 import "./styles.css";
 
 const FIXED_STEP = 1 / 60;
 const SCENE_SEED = readSeedFromUrl();
-
-interface ShipView {
-  group: THREE.Group;
-  selectionRing: THREE.Mesh;
-  thrusterGlows: THREE.Mesh[];
-}
 
 interface CombatEffect {
   object: THREE.Object3D;
@@ -81,6 +80,8 @@ const newEncounterButton = getElement<HTMLButtonElement>("#new-encounter");
 const seedActionStatus = getElement<HTMLElement>("#seed-action-status");
 const battleLogList = getElement<HTMLOListElement>("#battle-log");
 const battleLogCount = getElement<HTMLElement>("#battle-log-count");
+const effectsQualityToggle = getElement<HTMLInputElement>("#effects-quality");
+const effectsQualityValue = getElement<HTMLElement>("#effects-quality-value");
 const minimapCanvas = getElement<HTMLCanvasElement>("#minimap");
 const selectionBox = getElement<HTMLDivElement>("#selection-box");
 const minimapContext = minimapCanvas.getContext("2d");
@@ -180,9 +181,12 @@ scene.add(targetMarker);
 
 const world = createWorldState();
 const shipViews = new Map<string, ShipView>();
+let effectsQuality: EffectsQuality = readEffectsQuality();
+effectsQualityToggle.checked = effectsQuality === "high";
+updateEffectsQualityLabel();
 const neutralViews = new Map<string, THREE.Group>();
 for (const unit of world.units.values()) {
-  const view = createShipView(unit);
+  const view = createShipVisual(unit);
   shipViews.set(unit.id, view);
   scene.add(view.group);
 }
@@ -229,6 +233,7 @@ window.addEventListener("keydown", handleKeyDown);
 copySeedButton.addEventListener("click", copyEncounterLink);
 restartEncounterButton.addEventListener("click", resetEncounter);
 newEncounterButton.addEventListener("click", startNewEncounter);
+effectsQualityToggle.addEventListener("change", handleEffectsQualityChange);
 minimapCanvas.addEventListener("pointerdown", handleMinimapPointerDown);
 minimapCanvas.addEventListener("keydown", handleMinimapKeyDown);
 renderer.domElement.addEventListener("pointerdown", handlePointerDown);
@@ -482,22 +487,7 @@ function renderPresentation(): void {
       continue;
     }
 
-    view.group.visible = !unit.destroyed;
-    view.group.position.set(
-      unit.position.x,
-      unit.position.y,
-      unit.position.z,
-    );
-    view.group.rotation.y = unit.heading;
-    view.selectionRing.visible = unit.selected && unit.owner === "player";
-
-    const thrusterPulse = 0.94 + Math.sin(simulationTime * 8) * 0.06;
-    for (const thruster of view.thrusterGlows) {
-      thruster.scale.set(1, thrusterPulse, 1);
-    }
-
-    const selectionPulse = 1 + Math.sin(simulationTime * 4) * 0.018;
-    view.selectionRing.scale.setScalar(selectionPulse);
+    updateShipVisual(view, unit, simulationTime, effectsQuality);
   }
 
   updateTargetMarker();
@@ -1391,7 +1381,7 @@ function loadEncounter(seed: number, statusMessage: string): void {
 
   for (const unit of freshUnits.values()) {
     if (!shipViews.has(unit.id)) {
-      const view = createShipView(unit);
+      const view = createShipVisual(unit);
       shipViews.set(unit.id, view);
       scene.add(view.group);
     }
@@ -1461,6 +1451,23 @@ function getEncounterSummary(): string {
   return playerCount + "V" + enemyCount + " · SEED " + String(world.seed >>> 0);
 }
 
+function readEffectsQuality(): EffectsQuality {
+  return window.localStorage.getItem("rts-effects-quality") === "low"
+    ? "low"
+    : "high";
+}
+
+function handleEffectsQualityChange(): void {
+  effectsQuality = effectsQualityToggle.checked ? "high" : "low";
+  window.localStorage.setItem("rts-effects-quality", effectsQuality);
+  updateEffectsQualityLabel();
+  addBattleLog("system", "VISUAL EFFECTS · " + effectsQuality.toUpperCase());
+}
+
+function updateEffectsQualityLabel(): void {
+  effectsQualityValue.textContent = effectsQuality.toUpperCase();
+}
+
 function createWorldState(): WorldState {
   const encounter = createEncounter(SCENE_SEED);
   return {
@@ -1521,271 +1528,6 @@ function createNeutralView(neutral: NeutralObject): THREE.Group {
   return group;
 }
 
-function createShipView(unit: Unit): ShipView {
-  const shipClass = getShipClass(unit);
-  const group = new THREE.Group();
-  group.name = unit.id + "-view";
-  group.userData.unitId = unit.id;
-  group.scale.setScalar(shipClass.scale);
-
-  const factionColor = unit.owner === "player" ? 0x5ca7b2 : 0xa45748;
-  const accentColor = unit.owner === "player" ? 0x83c1ca : 0xcf7157;
-  const hullMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x3a484d : 0x41413f,
-    emissive: unit.owner === "player" ? 0x020a0d : 0x090302,
-    emissiveIntensity: 0.28,
-    metalness: 0.62,
-    roughness: 0.5,
-    flatShading: true,
-  });
-  const armorMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x52636a : 0x5b5956,
-    emissive: 0x030405,
-    emissiveIntensity: 0.12,
-    metalness: 0.7,
-    roughness: 0.4,
-    flatShading: true,
-  });
-  const panelMaterial = new THREE.MeshStandardMaterial({
-    color: unit.owner === "player" ? 0x1d272c : 0x242322,
-    metalness: 0.58,
-    roughness: 0.62,
-  });
-  const accentMaterial = new THREE.MeshStandardMaterial({
-    color: factionColor,
-    emissive: factionColor,
-    emissiveIntensity: 0.62,
-    metalness: 0.48,
-    roughness: 0.32,
-  });
-  const engineMaterial = new THREE.MeshBasicMaterial({
-    color: accentColor,
-    transparent: true,
-    opacity: 0.72,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-
-  if (unit.classId === "scout") {
-    const hull = new THREE.Mesh(createAngularHullGeometry(6.2, 13.5, 2.1), hullMaterial);
-    group.add(hull);
-
-    const dorsalArmor = new THREE.Mesh(
-      createAngularHullGeometry(3.4, 7.8, 0.75),
-      armorMaterial,
-    );
-    dorsalArmor.position.set(0, 1.25, 0.45);
-    group.add(dorsalArmor);
-
-    for (const side of [-1, 1]) {
-      const wing = new THREE.Mesh(
-        new THREE.BoxGeometry(4.8, 0.46, 2.2),
-        armorMaterial,
-      );
-      wing.position.set(side * 3.5, -0.5, -1.2);
-      wing.rotation.y = side * -0.22;
-      group.add(wing);
-
-      const panelStrip = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.12, 5.1),
-        accentMaterial,
-      );
-      panelStrip.position.set(side * 1.45, 1.47, -0.25);
-      group.add(panelStrip);
-    }
-
-    const sensor = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.62, 0),
-      accentMaterial,
-    );
-    sensor.position.set(0, 1.88, 3.1);
-    group.add(sensor);
-  } else if (unit.classId === "striker") {
-    const hull = new THREE.Mesh(createAngularHullGeometry(9.4, 15.2, 3.2), hullMaterial);
-    group.add(hull);
-
-    const prowArmor = new THREE.Mesh(
-      createAngularHullGeometry(5.2, 8.4, 1.05),
-      armorMaterial,
-    );
-    prowArmor.position.set(0, 2.0, 2.7);
-    group.add(prowArmor);
-
-    for (const side of [-1, 1]) {
-      const armorPlate = new THREE.Mesh(
-        createAngularHullGeometry(4.4, 8.6, 0.72),
-        armorMaterial,
-      );
-      armorPlate.position.set(side * 3.45, 0.7, -0.8);
-      armorPlate.rotation.y = side * 0.09;
-      group.add(armorPlate);
-
-      const gunMount = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.9, 1.15, 1.0, 6),
-        panelMaterial,
-      );
-      gunMount.position.set(side * 3.55, 1.3, 3.25);
-      group.add(gunMount);
-
-      const gun = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.2, 0.28, 4.8, 8),
-        panelMaterial,
-      );
-      gun.rotation.x = Math.PI / 2;
-      gun.position.set(side * 3.55, 1.45, 5.25);
-      group.add(gun);
-
-      const muzzle = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.24, 0.24, 0.2, 8),
-        accentMaterial,
-      );
-      muzzle.rotation.x = Math.PI / 2;
-      muzzle.position.set(side * 3.55, 1.45, 7.66);
-      group.add(muzzle);
-    }
-
-    const centerStrip = new THREE.Mesh(
-      new THREE.BoxGeometry(0.2, 0.16, 9.5),
-      accentMaterial,
-    );
-    centerStrip.position.set(0, 2.58, -0.4);
-    group.add(centerStrip);
-  } else {
-    const hull = new THREE.Mesh(createAngularHullGeometry(10.8, 20.5, 4.2), hullMaterial);
-    group.add(hull);
-
-    const spine = new THREE.Mesh(
-      new THREE.BoxGeometry(3.4, 2.2, 17.5),
-      armorMaterial,
-    );
-    spine.position.set(0, 2.35, -0.4);
-    group.add(spine);
-
-    for (const side of [-1, 1]) {
-      const hangar = new THREE.Mesh(
-        createAngularHullGeometry(3.8, 13.2, 2.8),
-        armorMaterial,
-      );
-      hangar.position.set(side * 6.3, -0.35, -1.2);
-      hangar.rotation.y = side * 0.035;
-      group.add(hangar);
-
-      const hangarDoor = new THREE.Mesh(
-        new THREE.BoxGeometry(3.86, 0.18, 7.2),
-        panelMaterial,
-      );
-      hangarDoor.position.set(side * 6.3, 1.12, -0.9);
-      group.add(hangarDoor);
-
-      const registryStripe = new THREE.Mesh(
-        new THREE.BoxGeometry(0.22, 0.16, 10.5),
-        accentMaterial,
-      );
-      registryStripe.position.set(side * 4.95, 2.25, -0.4);
-      group.add(registryStripe);
-    }
-
-    const commandDeck = new THREE.Mesh(
-      createAngularHullGeometry(4.6, 5.2, 2.1),
-      panelMaterial,
-    );
-    commandDeck.position.set(0, 4.35, 1.45);
-    group.add(commandDeck);
-
-    const bridgeLight = new THREE.Mesh(
-      new THREE.BoxGeometry(3.2, 0.18, 0.34),
-      accentMaterial,
-    );
-    bridgeLight.position.set(0, 4.8, 4.05);
-    group.add(bridgeLight);
-
-    const antenna = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.18, 3.4, 8),
-      armorMaterial,
-    );
-    antenna.position.set(0, 6.7, 0.8);
-    group.add(antenna);
-  }
-
-  const thrusterGlows: THREE.Mesh[] = [];
-  const thrusterCount = unit.classId === "carrier" ? 3 : 2;
-  const thrusterSpacing = unit.classId === "carrier" ? 3.1 : 2.25;
-  const thrusterZ = unit.classId === "carrier" ? -9.6 : unit.classId === "striker" ? -7.2 : -6.1;
-  for (let index = 0; index < thrusterCount; index += 1) {
-    const x = (index - (thrusterCount - 1) / 2) * thrusterSpacing;
-    const housing = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.72, 0.95, 2.5, 10),
-      panelMaterial,
-    );
-    housing.rotation.x = Math.PI / 2;
-    housing.position.set(x, -0.3, thrusterZ + 0.8);
-    group.add(housing);
-
-    const thruster = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.38, 0.72, 2.2, 10),
-      engineMaterial,
-    );
-    thruster.rotation.x = Math.PI / 2;
-    thruster.position.set(x, -0.3, thrusterZ - 0.8);
-    group.add(thruster);
-    thrusterGlows.push(thruster);
-  }
-
-  const ringRadius = unit.classId === "carrier" ? 9.1 : unit.classId === "striker" ? 7.1 : 5.8;
-  const selectionRing = new THREE.Mesh(
-    new THREE.RingGeometry(ringRadius, ringRadius + 0.14, 64, 1, 0.22, Math.PI * 1.58),
-    new THREE.MeshBasicMaterial({
-      color: factionColor,
-      transparent: true,
-      opacity: 0.55,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  selectionRing.rotation.x = -Math.PI / 2;
-  selectionRing.position.y = GROUND_Y - SHIP_Y + 0.2;
-  selectionRing.visible = false;
-  group.add(selectionRing);
-
-  const shipLight = new THREE.PointLight(factionColor, 3.5, 24, 2);
-  shipLight.position.set(0, 0.8, -2);
-  group.add(shipLight);
-
-  group.position.set(unit.position.x, unit.position.y, unit.position.z);
-  group.rotation.y = unit.heading;
-  return { group, selectionRing, thrusterGlows };
-}
-
-function createAngularHullGeometry(
-  width: number,
-  length: number,
-  height: number,
-): THREE.ExtrudeGeometry {
-  const shape = new THREE.Shape();
-  shape.moveTo(0, length * 0.5);
-  shape.lineTo(width * 0.32, length * 0.2);
-  shape.lineTo(width * 0.5, -length * 0.22);
-  shape.lineTo(width * 0.3, -length * 0.5);
-  shape.lineTo(-width * 0.3, -length * 0.5);
-  shape.lineTo(-width * 0.5, -length * 0.22);
-  shape.lineTo(-width * 0.32, length * 0.2);
-  shape.closePath();
-
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: height,
-    steps: 1,
-    bevelEnabled: true,
-    bevelSegments: 1,
-    bevelSize: 0.16,
-    bevelThickness: 0.18,
-  });
-  geometry.center();
-  geometry.rotateX(Math.PI / 2);
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
 function readSeedFromUrl(): number {
   const rawSeed = new URLSearchParams(window.location.search).get("seed");
   if (!rawSeed) {
@@ -1808,7 +1550,7 @@ function createAttackEffect(attacker: Unit, target: Unit): void {
   const material = new THREE.LineBasicMaterial({
     color: attacker.owner === "player" ? 0x8fcbd2 : 0xd7a188,
     transparent: true,
-    opacity: 0.82,
+    opacity: effectsQuality === "high" ? 0.86 : 0.62,
     blending: THREE.AdditiveBlending,
   });
   const line = new THREE.Line(geometry, material);
@@ -1819,6 +1561,31 @@ function createAttackEffect(attacker: Unit, target: Unit): void {
     material,
     ttl: 0.16,
     maxTtl: 0.16,
+  });
+
+  if (effectsQuality === "high") {
+    createHitFlash(target, attacker.owner);
+  }
+}
+
+function createHitFlash(target: Unit, attackerOwner: Faction): void {
+  const geometry = new THREE.IcosahedronGeometry(0.86, 1);
+  const material = new THREE.MeshBasicMaterial({
+    color: attackerOwner === "player" ? 0xbdebf0 : 0xf0ae92,
+    transparent: true,
+    opacity: 0.88,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const flash = new THREE.Mesh(geometry, material);
+  flash.position.set(target.position.x, target.position.y, target.position.z);
+  scene.add(flash);
+  combatEffects.push({
+    object: flash,
+    geometry,
+    material,
+    ttl: 0.24,
+    maxTtl: 0.24,
   });
 }
 
