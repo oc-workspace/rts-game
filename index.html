@@ -10,7 +10,7 @@
     <main id="app" aria-label="RTS game viewport">
       <section class="hud hud--top" aria-label="Runtime status">
         <div>
-          <p class="eyebrow">RTS GAME // P4 RANDOM ENCOUNTER</p>
+          <p class="eyebrow">RTS GAME // P4.3 ENCOUNTER CONTROL</p>
           <h1>KHEPRI RANDOM ENCOUNTER</h1>
         </div>
         <div class="status-cluster">
@@ -43,6 +43,45 @@
         <p class="hint">LMB SELECT · SHIFT BOX/ADD · SHIFT RMB QUEUE · CTRL 1-9 GROUP · 1-9 SELECT · S STOP · P PAUSE</p>
       </section>
 
+      <section id="encounter-panel" class="encounter-panel" aria-label="Encounter control">
+        <div class="panel-header">
+          <span>ENCOUNTER CONTROL</span>
+          <strong id="encounter-seed">20260810</strong>
+        </div>
+        <div class="encounter-actions" aria-label="Seed actions">
+          <button id="copy-seed" type="button">COPY LINK</button>
+          <button id="restart-encounter" type="button">RESTART</button>
+          <button id="new-encounter" type="button">NEW SEED</button>
+        </div>
+        <p id="seed-action-status" class="seed-action-status" aria-live="polite">LINK READY</p>
+        <dl class="encounter-metrics">
+          <div>
+            <dt>FRIENDLY</dt>
+            <dd id="friendly-status">0 / 0</dd>
+          </div>
+          <div>
+            <dt>HOSTILE</dt>
+            <dd id="hostile-status">0 / 0</dd>
+          </div>
+          <div>
+            <dt>LOSSES</dt>
+            <dd id="loss-status">0 / 0</dd>
+          </div>
+          <div>
+            <dt>SELECTED / QUEUED</dt>
+            <dd id="command-status">0 / 0</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section id="battle-log-panel" class="battle-log-panel" aria-label="Battle log">
+        <div class="panel-header">
+          <span>BATTLE LOG</span>
+          <strong id="battle-log-count">00</strong>
+        </div>
+        <ol id="battle-log" class="battle-log" aria-live="polite"></ol>
+      </section>
+
       <section id="fleet-panel" class="fleet-panel" aria-label="Player fleet control">
         <div class="fleet-panel__header">
           <span>PLAYER FLEET</span>
@@ -50,8 +89,8 @@
         </div>
         <ul id="fleet-list" class="fleet-list"></ul>
         <div class="minimap-frame">
-          <div class="minimap-frame__label">TACTICAL MAP // 72 KM RADIUS</div>
-          <canvas id="minimap" width="180" height="104" aria-label="Tactical map placeholder"></canvas>
+          <div class="minimap-frame__label">TACTICAL MAP // CLICK TO FOCUS</div>
+          <canvas id="minimap" width="180" height="104" tabindex="0" aria-label="Interactive tactical map"></canvas>
         </div>
       </section>
 

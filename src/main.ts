@@ -1,89 +1,33 @@
 import * as THREE from "three";
+import {
+  BATTLEFIELD_RADIUS,
+  createEncounter,
+  createSeededRandom,
+  DEFAULT_SEED,
+  GROUND_Y,
+  SHIP_CLASSES,
+  SHIP_Y,
+} from "./game/encounter";
+import {
+  activateNextOrder,
+  getFormationTarget,
+  queueUnitOrder,
+} from "./game/orders";
+import type {
+  AttackOrder,
+  Faction,
+  MoveOrder,
+  NeutralObject,
+  ShipClass,
+  Unit,
+  UnitOrder,
+  Vec3,
+  WorldState,
+} from "./game/types";
 import "./styles.css";
 
 const FIXED_STEP = 1 / 60;
-const DEFAULT_SEED = 20260810;
 const SCENE_SEED = readSeedFromUrl();
-const BATTLEFIELD_RADIUS = 72;
-const GROUND_Y = -18;
-const SHIP_Y = GROUND_Y + 5;
-
-type ShipClassId = "scout" | "striker" | "carrier";
-type Faction = "player" | "enemy";
-type UnitState = "idle" | "moving" | "attacking" | "destroyed";
-type UnitOrder =
-  | { type: "move"; targetPosition: Vec3 }
-  | { type: "attack"; targetUnitId: string };
-
-interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
-
-interface ShipClass {
-  id: ShipClassId;
-  name: string;
-  role: string;
-  speed: number;
-  maxHealth: number;
-  weaponRange: number;
-  damage: number;
-  cooldown: number;
-  scale: number;
-}
-
-interface Unit {
-  id: string;
-  owner: Faction;
-  classId: ShipClassId;
-  spawnPosition: Vec3;
-  position: Vec3;
-  heading: number;
-  targetPosition: Vec3 | null;
-  targetUnitId: string | null;
-  health: number;
-  cooldownRemaining: number;
-  state: UnitState;
-  orderQueue: UnitOrder[];
-  selected: boolean;
-  destroyed: boolean;
-}
-
-interface NeutralObject {
-  id: string;
-  position: Vec3;
-  scale: number;
-  rotation: Vec3;
-  spin: Vec3;
-}
-
-interface MoveOrder {
-  type: "move";
-  sourceUnitIds: string[];
-  targetPosition: Vec3;
-  createdAt: number;
-}
-
-interface AttackOrder {
-  type: "attack";
-  sourceUnitIds: string[];
-  targetUnitId: string;
-  createdAt: number;
-}
-
-interface WorldState {
-  seed: number;
-  units: Map<string, Unit>;
-  neutrals: Map<string, NeutralObject>;
-  selectedUnitIds: Set<string>;
-  groups: Map<number, Set<string>>;
-  aimedTargetId: string | null;
-  lastOrder: MoveOrder | AttackOrder | null;
-  statusMessage: string;
-  winner: Faction | null;
-  playerHasEngaged: boolean;
-}
 
 interface ShipView {
   group: THREE.Group;
@@ -99,41 +43,14 @@ interface CombatEffect {
   maxTtl: number;
 }
 
-const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
-  scout: {
-    id: "scout",
-    name: "AURORA SCOUT",
-    role: "LIGHT RECON",
-    speed: 18,
-    maxHealth: 140,
-    weaponRange: 42,
-    damage: 16,
-    cooldown: 0.7,
-    scale: 1.05,
-  },
-  striker: {
-    id: "striker",
-    name: "EMBER STRIKER",
-    role: "LINE COMBAT",
-    speed: 12,
-    maxHealth: 110,
-    weaponRange: 34,
-    damage: 8,
-    cooldown: 1.1,
-    scale: 1.12,
-  },
-  carrier: {
-    id: "carrier",
-    name: "BASTION CARRIER",
-    role: "HEAVY COMMAND",
-    speed: 8,
-    maxHealth: 180,
-    weaponRange: 42,
-    damage: 12,
-    cooldown: 1.6,
-    scale: 1.18,
-  },
-};
+type BattleLogTone = "system" | "friendly" | "hostile" | "result";
+
+interface BattleLogEntry {
+  id: number;
+  time: number;
+  message: string;
+  tone: BattleLogTone;
+}
 
 const app = getElement<HTMLDivElement>("#app");
 const runtimeStatus = getElement<HTMLElement>("#runtime-status");
@@ -153,6 +70,17 @@ const selectedUnitWeapon = getElement<HTMLElement>("#selected-unit-weapon");
 const selectedUnitOrder = getElement<HTMLElement>("#selected-unit-order");
 const fleetList = getElement<HTMLUListElement>("#fleet-list");
 const groupValues = getElement<HTMLElement>("#group-values");
+const encounterSeed = getElement<HTMLElement>("#encounter-seed");
+const friendlyStatus = getElement<HTMLElement>("#friendly-status");
+const hostileStatus = getElement<HTMLElement>("#hostile-status");
+const lossStatus = getElement<HTMLElement>("#loss-status");
+const commandStatus = getElement<HTMLElement>("#command-status");
+const copySeedButton = getElement<HTMLButtonElement>("#copy-seed");
+const restartEncounterButton = getElement<HTMLButtonElement>("#restart-encounter");
+const newEncounterButton = getElement<HTMLButtonElement>("#new-encounter");
+const seedActionStatus = getElement<HTMLElement>("#seed-action-status");
+const battleLogList = getElement<HTMLOListElement>("#battle-log");
+const battleLogCount = getElement<HTMLElement>("#battle-log-count");
 const minimapCanvas = getElement<HTMLCanvasElement>("#minimap");
 const selectionBox = getElement<HTMLDivElement>("#selection-box");
 const minimapContext = minimapCanvas.getContext("2d");
@@ -285,15 +213,24 @@ let selectionStartY = 0;
 let selectionEndX = 0;
 let selectionEndY = 0;
 let lastTacticalHudUpdate = 0;
+let battleLogVersion = 0;
+let renderedBattleLogVersion = -1;
+const battleLogEntries: BattleLogEntry[] = [];
 
 runtimeStatus.textContent = "SYSTEM ONLINE";
 simulationStatus.textContent = "RUNNING";
+addBattleLog("system", "ENCOUNTER INITIALIZED · " + getEncounterSummary());
 updateTelemetry(previousTime);
 updateUnitCard();
 renderPresentation();
 
 window.addEventListener("resize", handleResize);
 window.addEventListener("keydown", handleKeyDown);
+copySeedButton.addEventListener("click", copyEncounterLink);
+restartEncounterButton.addEventListener("click", resetEncounter);
+newEncounterButton.addEventListener("click", startNewEncounter);
+minimapCanvas.addEventListener("pointerdown", handleMinimapPointerDown);
+minimapCanvas.addEventListener("keydown", handleMinimapKeyDown);
 renderer.domElement.addEventListener("pointerdown", handlePointerDown);
 renderer.domElement.addEventListener("pointermove", handlePointerMove);
 renderer.domElement.addEventListener("pointerup", handlePointerUp);
@@ -413,24 +350,6 @@ function updatePlayerBehavior(state: WorldState, unit: Unit, step: number): void
   unit.state = "idle";
 }
 
-function activateNextOrder(unit: Unit): boolean {
-  const nextOrder = unit.orderQueue.shift();
-  if (!nextOrder) {
-    return false;
-  }
-
-  if (nextOrder.type === "move") {
-    unit.targetPosition = { ...nextOrder.targetPosition };
-    unit.targetUnitId = null;
-    unit.state = "moving";
-  } else {
-    unit.targetUnitId = nextOrder.targetUnitId;
-    unit.targetPosition = null;
-    unit.state = "attacking";
-  }
-  return true;
-}
-
 function updateEnemyBehavior(state: WorldState, unit: Unit, step: number): void {
   if (!state.playerHasEngaged && unit.health >= getShipClass(unit).maxHealth) {
     unit.targetUnitId = null;
@@ -473,6 +392,11 @@ function performAttack(state: WorldState, attacker: Unit, target: Unit): void {
   attacker.cooldownRemaining = attackerClass.cooldown;
   target.health = Math.max(0, target.health - attackerClass.damage);
   createAttackEffect(attacker, target);
+  addBattleLog(
+    attacker.owner === "player" ? "friendly" : "hostile",
+    attacker.id.toUpperCase() + " HIT " + target.id.toUpperCase() +
+      " · -" + attackerClass.damage,
+  );
 
   if (attacker.owner === "player") {
     state.statusMessage =
@@ -506,6 +430,7 @@ function destroyUnit(state: WorldState, unit: Unit, attacker: Unit): void {
   createImpactEffect(unit);
   state.statusMessage =
     unit.id.toUpperCase() + " DESTROYED BY " + attacker.id.toUpperCase();
+  addBattleLog("result", state.statusMessage);
   updateUnitCard();
 }
 
@@ -525,10 +450,12 @@ function checkBattleOutcome(state: WorldState): void {
     state.winner = "player";
     state.statusMessage = "VICTORY · ENEMY FLEET DESTROYED";
     paused = true;
+    addBattleLog("result", state.statusMessage);
   } else if (!playerAlive && enemyAlive) {
     state.winner = "enemy";
     state.statusMessage = "DEFEAT · SCOUT DESTROYED";
     paused = true;
+    addBattleLog("result", state.statusMessage);
   }
 }
 
@@ -640,6 +567,8 @@ function updateTelemetry(now: number): void {
     lastTacticalHudUpdate = now;
     updateUnitCard();
     updateFleetHud();
+    updateEncounterHud();
+    updateBattleLog();
     updateMinimap();
   }
 }
@@ -679,6 +608,64 @@ function updateFleetHud(): void {
     .map(([number, ids]) => "G" + number + " " + ids.size)
     .join("  ·  ");
   groupValues.textContent = groups || "NO GROUPS";
+}
+
+function updateEncounterHud(): void {
+  const units = [...world.units.values()];
+  const playerTotal = units.filter((unit) => unit.owner === "player").length;
+  const enemyTotal = units.filter((unit) => unit.owner === "enemy").length;
+  const playerAlive = units.filter(
+    (unit) => unit.owner === "player" && !unit.destroyed,
+  ).length;
+  const enemyAlive = units.filter(
+    (unit) => unit.owner === "enemy" && !unit.destroyed,
+  ).length;
+  const queuedOrders = units.reduce(
+    (total, unit) => total + unit.orderQueue.length,
+    0,
+  );
+
+  encounterSeed.textContent = String(world.seed >>> 0);
+  friendlyStatus.textContent = playerAlive + " / " + playerTotal;
+  hostileStatus.textContent = enemyAlive + " / " + enemyTotal;
+  lossStatus.textContent =
+    (playerTotal - playerAlive) + " / " + (enemyTotal - enemyAlive);
+  commandStatus.textContent = world.selectedUnitIds.size + " / " + queuedOrders;
+}
+
+function updateBattleLog(): void {
+  if (renderedBattleLogVersion === battleLogVersion) {
+    return;
+  }
+
+  renderedBattleLogVersion = battleLogVersion;
+  battleLogList.replaceChildren();
+  const visibleEntries = battleLogEntries.slice(-8).reverse();
+  for (const logEntry of visibleEntries) {
+    const entry = document.createElement("li");
+    entry.className = "battle-log__entry battle-log__entry--" + logEntry.tone;
+    const time = document.createElement("span");
+    time.className = "battle-log__time";
+    time.textContent = "T+" + logEntry.time.toFixed(1).padStart(5, "0");
+    const message = document.createElement("span");
+    message.textContent = logEntry.message;
+    entry.append(time, message);
+    battleLogList.append(entry);
+  }
+  battleLogCount.textContent = String(battleLogEntries.length).padStart(2, "0");
+}
+
+function addBattleLog(tone: BattleLogTone, message: string): void {
+  battleLogVersion += 1;
+  battleLogEntries.push({
+    id: battleLogVersion,
+    time: simulationTime,
+    message,
+    tone,
+  });
+  if (battleLogEntries.length > 40) {
+    battleLogEntries.shift();
+  }
 }
 
 function updateMinimap(): void {
@@ -730,6 +717,124 @@ function updateMinimap(): void {
       minimapContext.stroke();
     }
   }
+
+  const footprint = getCameraGroundFootprint();
+  if (footprint.length === 4) {
+    minimapContext.strokeStyle = "rgba(216, 223, 225, 0.62)";
+    minimapContext.lineWidth = 1;
+    minimapContext.beginPath();
+    footprint.forEach((position, index) => {
+      const point = toMap(position);
+      if (index === 0) {
+        minimapContext.moveTo(point.x, point.y);
+      } else {
+        minimapContext.lineTo(point.x, point.y);
+      }
+    });
+    minimapContext.closePath();
+    minimapContext.stroke();
+  }
+
+  const focusPoint = toMap({
+    x: cameraFocus.x,
+    y: GROUND_Y,
+    z: cameraFocus.z,
+  });
+  minimapContext.strokeStyle = "rgba(216, 223, 225, 0.9)";
+  minimapContext.beginPath();
+  minimapContext.moveTo(focusPoint.x - 3, focusPoint.y);
+  minimapContext.lineTo(focusPoint.x + 3, focusPoint.y);
+  minimapContext.moveTo(focusPoint.x, focusPoint.y - 3);
+  minimapContext.lineTo(focusPoint.x, focusPoint.y + 3);
+  minimapContext.stroke();
+}
+
+function getCameraGroundFootprint(): Vec3[] {
+  const corners = [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ];
+  const footprint: Vec3[] = [];
+
+  for (const [x, y] of corners) {
+    const point = new THREE.Vector3(x, y, 0.5).unproject(camera);
+    const direction = point.sub(camera.position).normalize();
+    if (Math.abs(direction.y) < 0.0001) {
+      return [];
+    }
+    const distance = (GROUND_Y - camera.position.y) / direction.y;
+    if (distance <= 0) {
+      return [];
+    }
+    const groundPoint = camera.position.clone().addScaledVector(direction, distance);
+    footprint.push({ x: groundPoint.x, y: GROUND_Y, z: groundPoint.z });
+  }
+
+  return footprint;
+}
+
+function handleMinimapPointerDown(event: PointerEvent): void {
+  if (event.button !== 0) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  const bounds = minimapCanvas.getBoundingClientRect();
+  focusCameraFromMinimap(
+    (event.clientX - bounds.left) / bounds.width,
+    (event.clientY - bounds.top) / bounds.height,
+  );
+}
+
+function handleMinimapKeyDown(event: KeyboardEvent): void {
+  const offsets: Record<string, { x: number; z: number }> = {
+    ArrowLeft: { x: -8, z: 0 },
+    ArrowRight: { x: 8, z: 0 },
+    ArrowUp: { x: 0, z: -8 },
+    ArrowDown: { x: 0, z: 8 },
+  };
+
+  if (event.key === "Enter") {
+    event.preventDefault();
+    focusCameraFromMinimap(0.5, 0.5);
+    return;
+  }
+
+  const offset = offsets[event.key];
+  if (!offset) {
+    return;
+  }
+  event.preventDefault();
+  cameraFocus.x = THREE.MathUtils.clamp(
+    cameraFocus.x + offset.x,
+    -BATTLEFIELD_RADIUS,
+    BATTLEFIELD_RADIUS,
+  );
+  cameraFocus.z = THREE.MathUtils.clamp(
+    cameraFocus.z + offset.z,
+    -BATTLEFIELD_RADIUS,
+    BATTLEFIELD_RADIUS,
+  );
+  applyCameraTransform();
+}
+
+function focusCameraFromMinimap(normalizedX: number, normalizedY: number): void {
+  cameraFocus.x = THREE.MathUtils.clamp(
+    normalizedX * BATTLEFIELD_RADIUS * 2 - BATTLEFIELD_RADIUS,
+    -BATTLEFIELD_RADIUS,
+    BATTLEFIELD_RADIUS,
+  );
+  cameraFocus.z = THREE.MathUtils.clamp(
+    normalizedY * BATTLEFIELD_RADIUS * 2 - BATTLEFIELD_RADIUS,
+    -BATTLEFIELD_RADIUS,
+    BATTLEFIELD_RADIUS,
+  );
+  applyCameraTransform();
+  world.statusMessage = "CAMERA FOCUS · " + formatPosition(cameraFocus);
+  seedActionStatus.textContent = world.statusMessage;
+  seedActionStatus.classList.remove("seed-action-status--error");
 }
 
 function handleResize(): void {
@@ -753,6 +858,7 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (key === "p") {
     paused = !paused;
     simulationStatus.textContent = paused ? "PAUSED" : "RUNNING";
+    addBattleLog("system", paused ? "SIMULATION PAUSED" : "SIMULATION RESUMED");
   }
 
   if (key === "n") {
@@ -1059,6 +1165,7 @@ function issueMoveOrder(target: Vec3, queue = false): void {
   };
   world.lastOrder = order;
   world.statusMessage = (queue ? "QUEUED MOVE · " : "MOVE ORDER · ") + formatPosition(target);
+  addBattleLog("friendly", world.statusMessage + " · " + selectedIds.length + " UNITS");
 
   selectedIds.forEach((unitId, index) => {
     const unit = world.units.get(unitId);
@@ -1067,12 +1174,7 @@ function issueMoveOrder(target: Vec3, queue = false): void {
         type: "move",
         targetPosition: getFormationTarget(target, index, selectedIds.length),
       };
-      if (queue && hasActiveOrder(unit)) {
-        unit.orderQueue.push(nextOrder);
-      } else {
-        unit.orderQueue = [];
-        applyOrder(unit, nextOrder);
-      }
+      queueUnitOrder(unit, nextOrder, queue);
     }
   });
   updateUnitCard();
@@ -1098,17 +1200,13 @@ function issueAttackOrder(targetId: string, queue = false): void {
   world.playerHasEngaged = true;
   world.statusMessage =
     (queue ? "QUEUED ATTACK · " : "ATTACK ORDER · ") + targetId.toUpperCase();
+  addBattleLog("friendly", world.statusMessage + " · " + selectedIds.length + " UNITS");
 
   for (const unitId of selectedIds) {
     const unit = world.units.get(unitId);
     if (unit && !unit.destroyed) {
       const nextOrder: UnitOrder = { type: "attack", targetUnitId: targetId };
-      if (queue && hasActiveOrder(unit)) {
-        unit.orderQueue.push(nextOrder);
-      } else {
-        unit.orderQueue = [];
-        applyOrder(unit, nextOrder);
-      }
+      queueUnitOrder(unit, nextOrder, queue);
     }
   }
   updateUnitCard();
@@ -1126,45 +1224,8 @@ function stopSelectedUnits(): void {
   }
   world.lastOrder = null;
   world.statusMessage = "STOPPED";
+  addBattleLog("system", "STOP ORDER · " + world.selectedUnitIds.size + " UNITS");
   updateUnitCard();
-}
-
-function hasActiveOrder(unit: Unit): boolean {
-  return Boolean(unit.targetPosition || unit.targetUnitId);
-}
-
-function applyOrder(unit: Unit, order: UnitOrder): void {
-  if (order.type === "move") {
-    unit.targetPosition = { ...order.targetPosition };
-    unit.targetUnitId = null;
-    unit.state = "moving";
-  } else {
-    unit.targetUnitId = order.targetUnitId;
-    unit.targetPosition = null;
-    unit.state = "attacking";
-  }
-}
-
-function getFormationTarget(target: Vec3, index: number, count: number): Vec3 {
-  const columns = Math.max(1, Math.ceil(Math.sqrt(count)));
-  const row = Math.floor(index / columns);
-  const column = index % columns;
-  const width = Math.min(columns, count - row * columns);
-  const offsetX = (column - (width - 1) / 2) * 4.5;
-  const offsetZ = -row * 4.5;
-  return {
-    x: THREE.MathUtils.clamp(
-      target.x + offsetX,
-      -BATTLEFIELD_RADIUS,
-      BATTLEFIELD_RADIUS,
-    ),
-    y: SHIP_Y,
-    z: THREE.MathUtils.clamp(
-      target.z + offsetZ,
-      -BATTLEFIELD_RADIUS,
-      BATTLEFIELD_RADIUS,
-    ),
-  };
 }
 
 function updateUnitCard(): void {
@@ -1269,20 +1330,61 @@ function applyCameraTransform(): void {
 }
 
 function resetEncounter(): void {
+  loadEncounter(world.seed, "ENCOUNTER RESTARTED");
+}
+
+function startNewEncounter(): void {
+  const seedBuffer = new Uint32Array(1);
+  crypto.getRandomValues(seedBuffer);
+  const nextSeed = seedBuffer[0] === world.seed
+    ? (seedBuffer[0] + 1) >>> 0
+    : seedBuffer[0];
+  const url = getEncounterUrl(nextSeed);
+  window.history.replaceState(null, "", url);
+  loadEncounter(nextSeed, "NEW ENCOUNTER GENERATED");
+}
+
+async function copyEncounterLink(): Promise<void> {
+  const url = getEncounterUrl(world.seed).toString();
+  try {
+    if (!navigator.clipboard) {
+      throw new Error("Clipboard API unavailable");
+    }
+    await navigator.clipboard.writeText(url);
+    seedActionStatus.textContent = "LINK COPIED · " + String(world.seed >>> 0);
+    seedActionStatus.classList.remove("seed-action-status--error");
+    addBattleLog("system", "ENCOUNTER LINK COPIED");
+  } catch {
+    seedActionStatus.textContent = "COPY FAILED · USE ADDRESS BAR";
+    seedActionStatus.classList.add("seed-action-status--error");
+    addBattleLog("system", "ENCOUNTER LINK COPY FAILED");
+  }
+}
+
+function getEncounterUrl(seed: number): URL {
+  const url = new URL(window.location.href);
+  url.searchParams.set("seed", String(seed >>> 0));
+  url.searchParams.delete("rev");
+  return url;
+}
+
+function loadEncounter(seed: number, statusMessage: string): void {
   paused = false;
   simulationTime = 0;
+  accumulator = 0;
+  world.seed = seed >>> 0;
   world.winner = null;
   world.lastOrder = null;
   world.aimedTargetId = null;
   world.playerHasEngaged = false;
+  world.groups.clear();
 
-  const freshUnits = new Map(
-    createEncounter(world.seed).units.map((unit) => [unit.id, unit]),
-  );
+  const encounter = createEncounter(world.seed);
+  const freshUnits = new Map(encounter.units.map((unit) => [unit.id, unit]));
 
   for (const [id, view] of shipViews) {
     if (!freshUnits.has(id)) {
-      scene.remove(view.group);
+      removeSceneObject(view.group);
       shipViews.delete(id);
     }
   }
@@ -1300,12 +1402,63 @@ function resetEncounter(): void {
   }
   world.units = freshUnits;
 
+  for (const view of neutralViews.values()) {
+    removeSceneObject(view);
+  }
+  neutralViews.clear();
+  world.neutrals = new Map(
+    encounter.neutrals.map((neutral) => [neutral.id, neutral]),
+  );
+  for (const neutral of world.neutrals.values()) {
+    const view = createNeutralView(neutral);
+    neutralViews.set(neutral.id, view);
+    scene.add(view);
+  }
+
   clearCombatEffects();
   world.selectedUnitIds.clear();
-  world.statusMessage = "ENCOUNTER RESET";
+  world.statusMessage = statusMessage;
   targetMarker.visible = false;
-  setSelection(null);
   resetCamera();
+  battleLogEntries.length = 0;
+  renderedBattleLogVersion = -1;
+  addBattleLog("system", statusMessage + " · " + getEncounterSummary());
+  seedActionStatus.textContent = statusMessage;
+  seedActionStatus.classList.remove("seed-action-status--error");
+  updateUnitCard();
+  updateFleetHud();
+  updateEncounterHud();
+  updateBattleLog();
+  updateMinimap();
+}
+
+function removeSceneObject(object: THREE.Object3D): void {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  object.traverse((child) => {
+    const renderable = child as THREE.Mesh;
+    if (renderable.geometry instanceof THREE.BufferGeometry) {
+      geometries.add(renderable.geometry);
+    }
+    if (Array.isArray(renderable.material)) {
+      renderable.material.forEach((material) => materials.add(material));
+    } else if (renderable.material instanceof THREE.Material) {
+      materials.add(renderable.material);
+    }
+  });
+  scene.remove(object);
+  geometries.forEach((geometry) => geometry.dispose());
+  materials.forEach((material) => material.dispose());
+}
+
+function getEncounterSummary(): string {
+  const playerCount = [...world.units.values()].filter(
+    (unit) => unit.owner === "player",
+  ).length;
+  const enemyCount = [...world.units.values()].filter(
+    (unit) => unit.owner === "enemy",
+  ).length;
+  return playerCount + "V" + enemyCount + " · SEED " + String(world.seed >>> 0);
 }
 
 function createWorldState(): WorldState {
@@ -1321,128 +1474,6 @@ function createWorldState(): WorldState {
     statusMessage: "SELECT A PLAYER UNIT",
     winner: null,
     playerHasEngaged: false,
-  };
-}
-
-function createEncounter(seed: number): {
-  units: Unit[];
-  neutrals: NeutralObject[];
-} {
-  const encounterRandom = createSeededRandom(seed ^ 0x9e3779b9);
-  const playerCount = 3 + Math.floor(encounterRandom() * 2);
-  const enemyCount = 3 + Math.floor(encounterRandom() * 2);
-  const playerAnchor = {
-    x: -30 + encounterRandom() * 8,
-    z: 24 + encounterRandom() * 8,
-  };
-  const enemyAnchor = {
-    x: 28 - encounterRandom() * 8,
-    z: -24 - encounterRandom() * 8,
-  };
-
-  return {
-    units: [
-      ...createFleet("player", playerCount, playerAnchor, 0, encounterRandom),
-      ...createFleet("enemy", enemyCount, enemyAnchor, Math.PI, encounterRandom),
-    ],
-    neutrals: createNeutralObjects(encounterRandom),
-  };
-}
-
-function createFleet(
-  owner: Faction,
-  count: number,
-  anchor: { x: number; z: number },
-  heading: number,
-  nextRandom: () => number,
-): Unit[] {
-  const playerPattern: ShipClassId[] = ["scout", "striker", "carrier", "scout"];
-  const enemyPattern: ShipClassId[] = ["striker", "carrier", "scout", "striker"];
-  const pattern = owner === "player" ? playerPattern : enemyPattern;
-  const prefix = owner === "player" ? "p" : "e";
-  const offsets = [
-    { x: 0, z: 0 },
-    { x: -2.4, z: -4.2 },
-    { x: 2.4, z: -4.2 },
-    { x: 0, z: -8.2 },
-  ];
-
-  return Array.from({ length: count }, (_, index) => {
-    const classId =
-      index === 0
-        ? pattern[0]
-        : pattern[Math.floor(nextRandom() * pattern.length)];
-    const offset = offsets[index] ?? {
-      x: (index % 2 === 0 ? -1 : 1) * (3 + index),
-      z: -10 - index * 3,
-    };
-    const cosine = Math.cos(heading);
-    const sine = Math.sin(heading);
-    const x = anchor.x + offset.x * cosine + offset.z * sine;
-    const z = anchor.z - offset.x * sine + offset.z * cosine;
-    return createUnit(
-      prefix + "-" + classId + "-" + String(index + 1).padStart(2, "0"),
-      owner,
-      classId,
-      x,
-      z,
-      heading,
-    );
-  });
-}
-
-function createNeutralObjects(nextRandom: () => number): NeutralObject[] {
-  const count = 7 + Math.floor(nextRandom() * 4);
-  return Array.from({ length: count }, (_, index) => {
-    const angle = nextRandom() * Math.PI * 2;
-    const radius = 16 + nextRandom() * 44;
-    return {
-      id: "asteroid-" + String(index + 1).padStart(2, "0"),
-      position: {
-        x: Math.cos(angle) * radius,
-        y: GROUND_Y + 1.1 + nextRandom() * 1.4,
-        z: Math.sin(angle) * radius,
-      },
-      scale: 0.8 + nextRandom() * 1.7,
-      rotation: {
-        x: nextRandom() * Math.PI,
-        y: nextRandom() * Math.PI,
-        z: nextRandom() * Math.PI,
-      },
-      spin: {
-        x: -0.06 + nextRandom() * 0.12,
-        y: -0.08 + nextRandom() * 0.16,
-        z: -0.06 + nextRandom() * 0.12,
-      },
-    };
-  });
-}
-
-function createUnit(
-  id: string,
-  owner: Faction,
-  classId: ShipClassId,
-  x: number,
-  z: number,
-  heading: number,
-): Unit {
-  const shipClass = SHIP_CLASSES[classId];
-  const position = { x, y: SHIP_Y, z };
-  return {
-    id,
-    owner,
-    classId,
-    spawnPosition: { ...position },
-    position,
-    heading,
-    targetPosition: null,
-    targetUnitId: null,
-    health: shipClass.maxHealth,
-    cooldownRemaining: 0,
-    state: "idle",
-    orderQueue: [],
-    selected: false,
-    destroyed: false,
   };
 }
 
@@ -2074,18 +2105,6 @@ function createDistantPlanet(): THREE.Group {
   );
   group.add(atmosphere);
   return group;
-}
-
-function createSeededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-
-  return () => {
-    state += 0x6d2b79f5;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function distanceBetween(first: Vec3, second: Vec3): number {
