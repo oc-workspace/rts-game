@@ -113,6 +113,8 @@ Simulation 是游戏规则的唯一来源。它不依赖 Three.js 对象，能�
 
 第一版不引入重量级 ECS 框架。先用显式 registry、纯函数规则和清晰的系统更新顺序；当实体数量和组件组合确实需要 ECS 时再迁移。
 
+P4.3 已将共享数据类型、deterministic encounter 和指令队列分别拆分到 `src/game/types.ts`、`src/game/encounter.ts` 和 `src/game/orders.ts`。这些模块不依赖 DOM 或 Three.js，并通过 Vitest 直接验证 seed、生成边界、编队边界和队列行为。
+
 ### 4.3 Renderer
 
 Renderer 把 Simulation 的状态映射为 Three.js 表现对象：

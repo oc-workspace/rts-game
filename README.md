@@ -2,7 +2,21 @@
 
 家园风格、宇宙规模的随机模式 3D RTS 实验项目。
 
-当前阶段先完成项目背景、技术路线和开发/发布约定；核心玩法与美术资产将在后续迭代中实现。
+当前已完成 P4.3 随机遭遇闭环：固定 seed 舰队生成、多选与控制组、移动/攻击队列、战斗结果、遭遇状态、战斗日志、链接复制/重开和小地图导航均可运行。当前舰船仍是程序化原型资产，下一阶段进入 P5 视觉表现。
+
+## 预览
+
+- <https://rts-game-dev.rococo.dev>
+- 固定遭遇：<https://rts-game-dev.rococo.dev/?seed=20260810>
+
+## 验证命令
+
+```bash
+npm install
+npm test
+npm run typecheck
+npm run build
+```
 
 ## 文档
 
@@ -10,6 +24,7 @@
 - [渲染/游戏框架对比与选型](docs/engine-comparison.md)
 - [技术开发方案](docs/technical-solution.md)
 - [开发计划](docs/development-plan.md)
+- [开发进度](docs/progress/README.md)
 
 ## 当前结论
 
