@@ -6,11 +6,31 @@ export type EffectsQuality = "high" | "low";
 
 export interface ShipView {
   group: THREE.Group;
+  detailGroup: THREE.Group;
+  distantHull: THREE.Mesh;
   selectionRing: THREE.Mesh;
   thrusterGlows: THREE.Mesh[];
   thrusterCores: THREE.Mesh[];
   damageOverlays: THREE.Mesh[];
   shipLight: THREE.PointLight;
+}
+
+export function createDistantShipBatch(
+  owner: Faction,
+  classId: ShipClassId,
+  capacity: number,
+): THREE.InstancedMesh {
+  const source = createDistantHull(classId, getPalette(owner));
+  const batch = new THREE.InstancedMesh(
+    source.geometry,
+    source.material,
+    capacity,
+  );
+  batch.name = owner + "-" + classId + "-distant-batch";
+  batch.count = 0;
+  batch.frustumCulled = false;
+  batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  return batch;
 }
 
 interface ShipPalette {
@@ -48,23 +68,29 @@ export function createShipVisual(unit: Unit): ShipView {
   group.name = unit.id + "-view";
   group.userData.unitId = unit.id;
   group.scale.setScalar(shipClass.scale);
+  const detailGroup = new THREE.Group();
+  detailGroup.name = "detail-lod";
+  group.add(detailGroup);
 
   if (unit.classId === "scout") {
-    buildScout(group, materials);
+    buildScout(detailGroup, materials);
   } else if (unit.classId === "striker") {
-    buildStriker(group, materials);
+    buildStriker(detailGroup, materials);
   } else {
-    buildCarrier(group, materials);
+    buildCarrier(detailGroup, materials);
   }
 
-  group.add(createRegistryDecal(unit.classId, palette.accent));
+  detailGroup.add(createRegistryDecal(unit.classId, palette.accent));
   const damageOverlays = createDamageOverlays(unit.classId);
-  damageOverlays.forEach((overlay) => group.add(overlay));
+  damageOverlays.forEach((overlay) => detailGroup.add(overlay));
   const { thrusterGlows, thrusterCores } = createThrusters(
-    group,
+    detailGroup,
     unit.classId,
     materials,
   );
+  const distantHull = createDistantHull(unit.classId, palette);
+  distantHull.visible = false;
+  group.add(distantHull);
   const selectionRing = createSelectionRing(unit.classId, palette.faction);
   group.add(selectionRing);
 
@@ -76,6 +102,8 @@ export function createShipVisual(unit: Unit): ShipView {
   group.rotation.y = unit.heading;
   return {
     group,
+    detailGroup,
+    distantHull,
     selectionRing,
     thrusterGlows,
     thrusterCores,
@@ -89,10 +117,15 @@ export function updateShipVisual(
   unit: Unit,
   simulationTime: number,
   quality: EffectsQuality,
+  useDistantLod: boolean,
+  enableShipLight: boolean,
+  showIndividualDistantHull = true,
 ): void {
   view.group.visible = !unit.destroyed;
   view.group.position.set(unit.position.x, unit.position.y, unit.position.z);
   view.group.rotation.y = unit.heading;
+  view.detailGroup.visible = !useDistantLod;
+  view.distantHull.visible = useDistantLod && showIndividualDistantHull;
   view.selectionRing.visible = unit.selected && unit.owner === "player";
 
   const engineLoad = unit.state === "moving"
@@ -101,12 +134,18 @@ export function updateShipVisual(
       ? 1.04
       : 0.82;
   const pulse = 0.94 + Math.sin(simulationTime * 9 + unit.id.length) * 0.08;
-  for (const thruster of view.thrusterGlows) {
-    thruster.visible = quality === "high";
-    thruster.scale.set(1, engineLoad * pulse, 1);
-  }
-  for (const core of view.thrusterCores) {
-    core.scale.set(1, engineLoad * (0.96 + Math.sin(simulationTime * 11) * 0.04), 1);
+  if (!useDistantLod) {
+    for (const thruster of view.thrusterGlows) {
+      thruster.visible = quality === "high";
+      thruster.scale.set(1, engineLoad * pulse, 1);
+    }
+    for (const core of view.thrusterCores) {
+      core.scale.set(
+        1,
+        engineLoad * (0.96 + Math.sin(simulationTime * 11) * 0.04),
+        1,
+      );
+    }
   }
 
   const healthRatio = THREE.MathUtils.clamp(
@@ -118,14 +157,49 @@ export function updateShipVisual(
   for (let index = 0; index < view.damageOverlays.length; index += 1) {
     const overlay = view.damageOverlays[index];
     const threshold = 0.22 + index * 0.2;
-    overlay.visible = quality === "high" && damage > threshold;
+    overlay.visible =
+      !useDistantLod && quality === "high" && damage > threshold;
     const material = overlay.material as THREE.MeshBasicMaterial;
-    material.opacity = THREE.MathUtils.clamp((damage - threshold) * 1.8, 0.18, 0.78);
+    material.opacity = THREE.MathUtils.clamp(
+      (damage - threshold) * 1.8,
+      0.18,
+      0.78,
+    );
   }
 
-  view.shipLight.visible = quality === "high";
+  view.shipLight.visible =
+    !useDistantLod && quality === "high" && enableShipLight;
   view.shipLight.intensity = unit.state === "moving" ? 4.1 : 2.8;
   view.selectionRing.scale.setScalar(1 + Math.sin(simulationTime * 4) * 0.018);
+}
+
+function createDistantHull(
+  classId: ShipClassId,
+  palette: ShipPalette,
+): THREE.Mesh {
+  const dimensions = classId === "carrier"
+    ? [10.8, 20.5, 4.2]
+    : classId === "striker"
+      ? [9.4, 15.2, 3.2]
+      : [6.2, 13.5, 2.1];
+  const hull = new THREE.Mesh(
+    createAngularHullGeometry(
+      dimensions[0],
+      dimensions[1],
+      dimensions[2],
+      false,
+    ),
+    new THREE.MeshStandardMaterial({
+      color: palette.hull,
+      emissive: palette.faction,
+      emissiveIntensity: 0.16,
+      metalness: 0.55,
+      roughness: 0.72,
+      flatShading: true,
+    }),
+  );
+  hull.name = "distant-hull-lod";
+  return hull;
 }
 
 function buildScout(group: THREE.Group, materials: MaterialSet): void {
@@ -576,6 +650,7 @@ function createAngularHullGeometry(
   width: number,
   length: number,
   height: number,
+  bevelEnabled = true,
 ): THREE.ExtrudeGeometry {
   const shape = new THREE.Shape();
   shape.moveTo(0, length * 0.5);
@@ -590,10 +665,10 @@ function createAngularHullGeometry(
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: height,
     steps: 1,
-    bevelEnabled: true,
+    bevelEnabled,
     bevelSegments: 1,
-    bevelSize: 0.16,
-    bevelThickness: 0.18,
+    bevelSize: bevelEnabled ? 0.16 : 0,
+    bevelThickness: bevelEnabled ? 0.18 : 0,
   });
   geometry.center();
   geometry.rotateX(Math.PI / 2);

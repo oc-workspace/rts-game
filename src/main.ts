@@ -7,7 +7,9 @@ import {
   GROUND_Y,
   SHIP_CLASSES,
   SHIP_Y,
+  STRESS_UNIT_COUNTS,
 } from "./game/encounter";
+import type { StressUnitCount } from "./game/encounter";
 import {
   activateNextOrder,
   getFormationTarget,
@@ -19,12 +21,14 @@ import type {
   MoveOrder,
   NeutralObject,
   ShipClass,
+  ShipClassId,
   Unit,
   UnitOrder,
   Vec3,
   WorldState,
 } from "./game/types";
 import {
+  createDistantShipBatch,
   createShipVisual,
   updateShipVisual,
 } from "./render/ship-visuals";
@@ -33,13 +37,30 @@ import "./styles.css";
 
 const FIXED_STEP = 1 / 60;
 const SCENE_SEED = readSeedFromUrl();
+const SCENE_STRESS_UNIT_COUNT = readStressUnitCountFromUrl();
+const LONG_FRAME_THRESHOLD_MS = 1000 / 30;
+const FLEET_LIST_LIMIT = 10;
+const MAX_SHIP_LIGHTS = 12;
+const DEFAULT_DETAIL_DISTANCE = 180;
+const STRESS_DETAIL_DISTANCE = 105;
+const SHIP_CLASS_IDS: ShipClassId[] = ["scout", "striker", "carrier"];
+const MAX_COMBAT_EFFECTS = 256;
+
+type CombatEffectKind = "line" | "burst";
+
+interface DistantShipBatch {
+  mesh: THREE.InstancedMesh;
+  unitIds: string[];
+}
 
 interface CombatEffect {
+  kind: CombatEffectKind;
   object: THREE.Object3D;
   geometry: THREE.BufferGeometry;
   material: THREE.LineBasicMaterial | THREE.MeshBasicMaterial;
   ttl: number;
   maxTtl: number;
+  baseScale: number;
 }
 
 type BattleLogTone = "system" | "friendly" | "hostile" | "result";
@@ -80,8 +101,13 @@ const newEncounterButton = getElement<HTMLButtonElement>("#new-encounter");
 const seedActionStatus = getElement<HTMLElement>("#seed-action-status");
 const battleLogList = getElement<HTMLOListElement>("#battle-log");
 const battleLogCount = getElement<HTMLElement>("#battle-log-count");
+const unitScaleSelect = getElement<HTMLSelectElement>("#unit-scale");
 const effectsQualityToggle = getElement<HTMLInputElement>("#effects-quality");
 const effectsQualityValue = getElement<HTMLElement>("#effects-quality-value");
+const visibleUnitCount = getElement<HTMLElement>("#visible-unit-count");
+const frameCost = getElement<HTMLElement>("#frame-cost");
+const longFrameCountValue = getElement<HTMLElement>("#long-frame-count");
+const drawCallCount = getElement<HTMLElement>("#draw-call-count");
 const minimapCanvas = getElement<HTMLCanvasElement>("#minimap");
 const selectionBox = getElement<HTMLDivElement>("#selection-box");
 const minimapContext = minimapCanvas.getContext("2d");
@@ -181,6 +207,19 @@ scene.add(targetMarker);
 
 const world = createWorldState();
 const shipViews = new Map<string, ShipView>();
+const distantShipBatches = new Map<string, DistantShipBatch>();
+const distantShipTransform = new THREE.Object3D();
+for (const owner of ["player", "enemy"] as Faction[]) {
+  for (const classId of SHIP_CLASS_IDS) {
+    const key = getDistantShipBatchKey(owner, classId);
+    const mesh = createDistantShipBatch(owner, classId, 200);
+    mesh.userData.batchKey = key;
+    distantShipBatches.set(key, { mesh, unitIds: [] });
+    scene.add(mesh);
+  }
+}
+let encounterUnitCount: StressUnitCount | null = SCENE_STRESS_UNIT_COUNT;
+unitScaleSelect.value = encounterUnitCount ? String(encounterUnitCount) : "";
 let effectsQuality: EffectsQuality = readEffectsQuality();
 effectsQualityToggle.checked = effectsQuality === "high";
 updateEffectsQualityLabel();
@@ -197,10 +236,18 @@ for (const neutral of world.neutrals.values()) {
 }
 
 const combatEffects: CombatEffect[] = [];
+const combatEffectPool: Record<CombatEffectKind, CombatEffect[]> = {
+  line: [],
+  burst: [],
+};
+let combatEffectObjectCount = 0;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -GROUND_Y);
 const pointerWorld = new THREE.Vector3();
+const projectionViewMatrix = new THREE.Matrix4();
+const viewFrustum = new THREE.Frustum();
+const visibilitySphere = new THREE.Sphere();
 
 let paused = false;
 let accumulator = 0;
@@ -208,6 +255,10 @@ let simulationTime = 0;
 let previousTime = performance.now();
 let frameCounter = 0;
 let fpsWindowStart = previousTime;
+let simulationWindowMs = 0;
+let renderWindowMs = 0;
+let longFrameCount = 0;
+let detailedShipCount = 0;
 let isPanning = false;
 let lastPointerX = 0;
 let lastPointerY = 0;
@@ -219,6 +270,7 @@ let selectionEndY = 0;
 let lastTacticalHudUpdate = 0;
 let battleLogVersion = 0;
 let renderedBattleLogVersion = -1;
+let renderedFleetSignature = "";
 const battleLogEntries: BattleLogEntry[] = [];
 
 runtimeStatus.textContent = "SYSTEM ONLINE";
@@ -233,6 +285,7 @@ window.addEventListener("keydown", handleKeyDown);
 copySeedButton.addEventListener("click", copyEncounterLink);
 restartEncounterButton.addEventListener("click", resetEncounter);
 newEncounterButton.addEventListener("click", startNewEncounter);
+unitScaleSelect.addEventListener("change", handleUnitScaleChange);
 effectsQualityToggle.addEventListener("change", handleEffectsQualityChange);
 minimapCanvas.addEventListener("pointerdown", handleMinimapPointerDown);
 minimapCanvas.addEventListener("keydown", handleMinimapKeyDown);
@@ -247,19 +300,27 @@ renderer.domElement.addEventListener("contextmenu", (event) => {
 requestAnimationFrame(render);
 
 function render(now: number): void {
-  const frameDelta = Math.min((now - previousTime) / 1000, 0.25);
+  const rawFrameMs = now - previousTime;
+  const frameDelta = Math.min(rawFrameMs / 1000, 0.25);
   previousTime = now;
   accumulator += frameDelta;
+  if (rawFrameMs > LONG_FRAME_THRESHOLD_MS && !document.hidden) {
+    longFrameCount += 1;
+  }
 
+  const simulationStart = performance.now();
   while (accumulator >= FIXED_STEP) {
     if (!paused) {
       updateSimulation(world, FIXED_STEP);
     }
     accumulator -= FIXED_STEP;
   }
+  simulationWindowMs += performance.now() - simulationStart;
 
+  const renderStart = performance.now();
   renderPresentation();
   renderer.render(scene, camera);
+  renderWindowMs += performance.now() - renderStart;
   updateTelemetry(now);
   requestAnimationFrame(render);
 }
@@ -469,25 +530,87 @@ function updateCombatEffects(step: number): void {
     const effect = combatEffects[index];
     effect.ttl -= step;
     effect.material.opacity = Math.max(0, effect.ttl / effect.maxTtl);
-    effect.object.scale.setScalar(1 + (1 - effect.ttl / effect.maxTtl) * 0.35);
+    effect.object.scale.setScalar(
+      effect.baseScale * (1 + (1 - effect.ttl / effect.maxTtl) * 0.35),
+    );
 
     if (effect.ttl <= 0) {
-      scene.remove(effect.object);
-      effect.geometry.dispose();
-      effect.material.dispose();
       combatEffects.splice(index, 1);
+      releaseCombatEffect(effect);
     }
   }
 }
 
 function renderPresentation(): void {
+  const useDistantBatches = world.units.size >= 50;
+  const detailDistance = world.units.size >= 50
+    ? STRESS_DETAIL_DISTANCE
+    : DEFAULT_DETAIL_DISTANCE;
+  const detailDistanceSquared = detailDistance * detailDistance;
+  let remainingShipLights = MAX_SHIP_LIGHTS;
+  detailedShipCount = 0;
+
+  for (const batch of distantShipBatches.values()) {
+    batch.mesh.count = 0;
+    batch.unitIds.length = 0;
+  }
+
   for (const unit of world.units.values()) {
     const view = shipViews.get(unit.id);
     if (!view) {
       continue;
     }
 
-    updateShipVisual(view, unit, simulationTime, effectsQuality);
+    const deltaX = camera.position.x - unit.position.x;
+    const deltaY = camera.position.y - unit.position.y;
+    const deltaZ = camera.position.z - unit.position.z;
+    const cameraDistanceSquared =
+      deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+    const useDistantLod =
+      !unit.selected && cameraDistanceSquared > detailDistanceSquared;
+    const enableShipLight = !useDistantLod && remainingShipLights > 0;
+    if (!useDistantLod) {
+      detailedShipCount += 1;
+    }
+    if (enableShipLight) {
+      remainingShipLights -= 1;
+    }
+    updateShipVisual(
+      view,
+      unit,
+      simulationTime,
+      effectsQuality,
+      useDistantLod,
+      enableShipLight,
+      !useDistantBatches,
+    );
+
+    if (useDistantBatches && useDistantLod && !unit.destroyed) {
+      const batch = distantShipBatches.get(
+        getDistantShipBatchKey(unit.owner, unit.classId),
+      );
+      if (batch) {
+        const instanceId = batch.unitIds.length;
+        distantShipTransform.position.set(
+          unit.position.x,
+          unit.position.y,
+          unit.position.z,
+        );
+        distantShipTransform.rotation.set(0, unit.heading, 0);
+        distantShipTransform.scale.setScalar(SHIP_CLASSES[unit.classId].scale);
+        distantShipTransform.updateMatrix();
+        batch.mesh.setMatrixAt(instanceId, distantShipTransform.matrix);
+        batch.unitIds.push(unit.id);
+      }
+    }
+  }
+
+  for (const batch of distantShipBatches.values()) {
+    batch.mesh.count = batch.unitIds.length;
+    batch.mesh.visible = batch.mesh.count > 0;
+    if (batch.mesh.count > 0) {
+      batch.mesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   updateTargetMarker();
@@ -528,33 +651,41 @@ function updateTelemetry(now: number): void {
 
   if (elapsed >= 500) {
     fpsValue.textContent = String(Math.round((frameCounter * 1000) / elapsed));
+    frameCost.textContent =
+      (simulationWindowMs / frameCounter).toFixed(2) + " / " +
+      (renderWindowMs / frameCounter).toFixed(2) + " MS";
+    visibleUnitCount.textContent =
+      getVisibleUnitCount() + " / " + detailedShipCount;
+    longFrameCountValue.textContent = String(longFrameCount);
+    drawCallCount.textContent = String(renderer.info.render.calls);
     frameCounter = 0;
     fpsWindowStart = now;
+    simulationWindowMs = 0;
+    renderWindowMs = 0;
   }
 
-  const aliveCount = [...world.units.values()].filter(
-    (unit) => !unit.destroyed,
-  ).length;
-  const playerAlive = [...world.units.values()].filter(
-    (unit) => unit.owner === "player" && !unit.destroyed,
-  ).length;
-  const enemyAlive = [...world.units.values()].filter(
-    (unit) => unit.owner === "enemy" && !unit.destroyed,
-  ).length;
-  seedValue.textContent = formatSeedLabel(world.seed);
-  encounterValue.textContent = playerAlive + "V" + enemyAlive;
-  unitCount.textContent = String(aliveCount);
-  simulationStatus.textContent = world.winner
-    ? world.winner === "player"
-      ? "VICTORY"
-      : "DEFEAT"
-    : paused
-      ? "PAUSED"
-      : "RUNNING";
-  runtimeStatus.textContent =
-    "SYSTEM ONLINE · T+" + simulationTime.toFixed(1).padStart(6, "0");
   if (now - lastTacticalHudUpdate >= 100) {
     lastTacticalHudUpdate = now;
+    const units = [...world.units.values()];
+    const aliveCount = units.filter((unit) => !unit.destroyed).length;
+    const playerAlive = units.filter(
+      (unit) => unit.owner === "player" && !unit.destroyed,
+    ).length;
+    const enemyAlive = units.filter(
+      (unit) => unit.owner === "enemy" && !unit.destroyed,
+    ).length;
+    seedValue.textContent = formatSeedLabel(world.seed);
+    encounterValue.textContent = playerAlive + "V" + enemyAlive;
+    unitCount.textContent = String(aliveCount);
+    simulationStatus.textContent = world.winner
+      ? world.winner === "player"
+        ? "VICTORY"
+        : "DEFEAT"
+      : paused
+        ? "PAUSED"
+        : "RUNNING";
+    runtimeStatus.textContent =
+      "SYSTEM ONLINE · T+" + simulationTime.toFixed(1).padStart(6, "0");
     updateUnitCard();
     updateFleetHud();
     updateEncounterHud();
@@ -563,21 +694,45 @@ function updateTelemetry(now: number): void {
   }
 }
 
+function getVisibleUnitCount(): number {
+  camera.updateMatrixWorld();
+  projectionViewMatrix.multiplyMatrices(
+    camera.projectionMatrix,
+    camera.matrixWorldInverse,
+  );
+  viewFrustum.setFromProjectionMatrix(projectionViewMatrix);
+
+  let count = 0;
+  for (const unit of world.units.values()) {
+    if (unit.destroyed) {
+      continue;
+    }
+    const radius = unit.classId === "carrier"
+      ? 13
+      : unit.classId === "striker"
+        ? 10
+        : 8;
+    visibilitySphere.center.set(unit.position.x, unit.position.y, unit.position.z);
+    visibilitySphere.radius = radius;
+    if (viewFrustum.intersectsSphere(visibilitySphere)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 function updateFleetHud(): void {
   const playerUnits = [...world.units.values()].filter(
     (unit) => unit.owner === "player",
   );
-  fleetList.replaceChildren();
-
-  for (const unit of playerUnits) {
-    const entry = document.createElement("li");
-    entry.className = "fleet-list__entry";
-    if (unit.selected) {
-      entry.classList.add("fleet-list__entry--selected");
-    }
-    if (unit.destroyed) {
-      entry.classList.add("fleet-list__entry--destroyed");
-    }
+  const displayUnits = playerUnits.slice(0, FLEET_LIST_LIMIT);
+  const selectedOutsideLimit = playerUnits.find(
+    (unit, index) => unit.selected && index >= FLEET_LIST_LIMIT,
+  );
+  if (selectedOutsideLimit) {
+    displayUnits[displayUnits.length - 1] = selectedOutsideLimit;
+  }
+  const entries = displayUnits.map((unit) => {
     const status = unit.destroyed
       ? "LOST"
       : unit.state === "attacking"
@@ -588,16 +743,43 @@ function updateFleetHud(): void {
     const queue = unit.orderQueue.length > 0
       ? " · Q" + unit.orderQueue.length
       : "";
-    entry.textContent =
-      unit.id.toUpperCase() + "  " + status + queue;
-    fleetList.append(entry);
-  }
+    return { unit, label: unit.id.toUpperCase() + "  " + status + queue };
+  });
 
   const groups = [...world.groups.entries()]
     .filter(([, ids]) => ids.size > 0)
     .map(([number, ids]) => "G" + number + " " + ids.size)
     .join("  ·  ");
-  groupValues.textContent = groups || "NO GROUPS";
+  const groupLabel = groups || "NO GROUPS";
+  const signature = entries.map(({ unit, label }) =>
+    unit.id + ":" + unit.selected + ":" + unit.destroyed + ":" + label
+  ).join("|") + "//" + groupLabel + "//" + playerUnits.length;
+  if (signature === renderedFleetSignature) {
+    return;
+  }
+
+  renderedFleetSignature = signature;
+  fleetList.replaceChildren();
+  for (const { unit, label } of entries) {
+    const entry = document.createElement("li");
+    entry.className = "fleet-list__entry";
+    if (unit.selected) {
+      entry.classList.add("fleet-list__entry--selected");
+    }
+    if (unit.destroyed) {
+      entry.classList.add("fleet-list__entry--destroyed");
+    }
+    entry.textContent = label;
+    fleetList.append(entry);
+  }
+  if (playerUnits.length > displayUnits.length) {
+    const summary = document.createElement("li");
+    summary.className = "fleet-list__entry fleet-list__entry--summary";
+    summary.textContent =
+      "+ " + (playerUnits.length - displayUnits.length) + " UNITS";
+    fleetList.append(summary);
+  }
+  groupValues.textContent = groupLabel;
 }
 
 function updateEncounterHud(): void {
@@ -972,12 +1154,38 @@ function handleWheel(event: WheelEvent): void {
 function pickUnit(event: PointerEvent): Unit | null {
   updatePointer(event);
   raycaster.setFromCamera(pointer, camera);
+  const pickTargets: THREE.Object3D[] = [];
+  for (const view of shipViews.values()) {
+    if (view.group.visible && view.detailGroup.visible) {
+      pickTargets.push(view.group);
+    }
+  }
+  for (const batch of distantShipBatches.values()) {
+    if (batch.mesh.visible && batch.mesh.count > 0) {
+      pickTargets.push(batch.mesh);
+    }
+  }
   const intersections = raycaster.intersectObjects(
-    [...shipViews.values()].map((view) => view.group),
+    pickTargets,
     true,
   );
 
   for (const intersection of intersections) {
+    if (
+      intersection.object instanceof THREE.InstancedMesh &&
+      intersection.instanceId !== undefined
+    ) {
+      const batchKey = intersection.object.userData.batchKey;
+      const batch = typeof batchKey === "string"
+        ? distantShipBatches.get(batchKey)
+        : undefined;
+      const unitId = batch?.unitIds[intersection.instanceId];
+      const unit = unitId ? world.units.get(unitId) : undefined;
+      if (unit && !unit.destroyed) {
+        return unit;
+      }
+    }
+
     let object: THREE.Object3D | null = intersection.object;
     while (object) {
       const unitId = object.userData.unitId;
@@ -1334,6 +1542,15 @@ function startNewEncounter(): void {
   loadEncounter(nextSeed, "NEW ENCOUNTER GENERATED");
 }
 
+function handleUnitScaleChange(): void {
+  encounterUnitCount = parseStressUnitCount(unitScaleSelect.value);
+  window.history.replaceState(null, "", getEncounterUrl(world.seed));
+  loadEncounter(
+    world.seed,
+    "FLEET SCALE · " + (encounterUnitCount ?? "SKIRMISH"),
+  );
+}
+
 async function copyEncounterLink(): Promise<void> {
   const url = getEncounterUrl(world.seed).toString();
   try {
@@ -1354,6 +1571,11 @@ async function copyEncounterLink(): Promise<void> {
 function getEncounterUrl(seed: number): URL {
   const url = new URL(window.location.href);
   url.searchParams.set("seed", String(seed >>> 0));
+  if (encounterUnitCount) {
+    url.searchParams.set("units", String(encounterUnitCount));
+  } else {
+    url.searchParams.delete("units");
+  }
   url.searchParams.delete("rev");
   return url;
 }
@@ -1368,8 +1590,9 @@ function loadEncounter(seed: number, statusMessage: string): void {
   world.aimedTargetId = null;
   world.playerHasEngaged = false;
   world.groups.clear();
+  clearDistantShipBatches();
 
-  const encounter = createEncounter(world.seed);
+  const encounter = createEncounter(world.seed, encounterUnitCount ?? undefined);
   const freshUnits = new Map(encounter.units.map((unit) => [unit.id, unit]));
 
   for (const [id, view] of shipViews) {
@@ -1412,6 +1635,8 @@ function loadEncounter(seed: number, statusMessage: string): void {
   resetCamera();
   battleLogEntries.length = 0;
   renderedBattleLogVersion = -1;
+  renderedFleetSignature = "";
+  resetPerformanceMetrics();
   addBattleLog("system", statusMessage + " · " + getEncounterSummary());
   seedActionStatus.textContent = statusMessage;
   seedActionStatus.classList.remove("seed-action-status--error");
@@ -1451,6 +1676,31 @@ function getEncounterSummary(): string {
   return playerCount + "V" + enemyCount + " · SEED " + String(world.seed >>> 0);
 }
 
+function resetPerformanceMetrics(): void {
+  frameCounter = 0;
+  fpsWindowStart = performance.now();
+  simulationWindowMs = 0;
+  renderWindowMs = 0;
+  longFrameCount = 0;
+  longFrameCountValue.textContent = "0";
+  frameCost.textContent = "-- / -- MS";
+}
+
+function getDistantShipBatchKey(
+  owner: Faction,
+  classId: ShipClassId,
+): string {
+  return owner + ":" + classId;
+}
+
+function clearDistantShipBatches(): void {
+  for (const batch of distantShipBatches.values()) {
+    batch.mesh.count = 0;
+    batch.mesh.visible = false;
+    batch.unitIds.length = 0;
+  }
+}
+
 function readEffectsQuality(): EffectsQuality {
   return window.localStorage.getItem("rts-effects-quality") === "low"
     ? "low"
@@ -1469,7 +1719,10 @@ function updateEffectsQualityLabel(): void {
 }
 
 function createWorldState(): WorldState {
-  const encounter = createEncounter(SCENE_SEED);
+  const encounter = createEncounter(
+    SCENE_SEED,
+    SCENE_STRESS_UNIT_COUNT ?? undefined,
+  );
   return {
     seed: SCENE_SEED,
     units: new Map(encounter.units.map((unit) => [unit.id, unit])),
@@ -1538,30 +1791,46 @@ function readSeedFromUrl(): number {
   return Number.isFinite(parsedSeed) ? parsedSeed >>> 0 : DEFAULT_SEED;
 }
 
+function readStressUnitCountFromUrl(): StressUnitCount | null {
+  return parseStressUnitCount(
+    new URLSearchParams(window.location.search).get("units") ?? "",
+  );
+}
+
+function parseStressUnitCount(value: string): StressUnitCount | null {
+  const parsed = Number.parseInt(value, 10);
+  return STRESS_UNIT_COUNTS.includes(parsed as StressUnitCount)
+    ? parsed as StressUnitCount
+    : null;
+}
+
 function formatSeedLabel(seed: number): string {
-  return "RTS-P4-" + String(seed >>> 0).slice(-6).padStart(6, "0");
+  return "RTS-P6-" + String(seed >>> 0).slice(-6).padStart(6, "0");
 }
 
 function createAttackEffect(attacker: Unit, target: Unit): void {
-  const geometry = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(attacker.position.x, attacker.position.y, attacker.position.z),
-    new THREE.Vector3(target.position.x, target.position.y, target.position.z),
-  ]);
-  const material = new THREE.LineBasicMaterial({
-    color: attacker.owner === "player" ? 0x8fcbd2 : 0xd7a188,
-    transparent: true,
-    opacity: effectsQuality === "high" ? 0.86 : 0.62,
-    blending: THREE.AdditiveBlending,
-  });
-  const line = new THREE.Line(geometry, material);
-  scene.add(line);
-  combatEffects.push({
-    object: line,
-    geometry,
-    material,
-    ttl: 0.16,
-    maxTtl: 0.16,
-  });
+  const effect = acquireCombatEffect("line");
+  if (effect) {
+    const positions = effect.geometry.getAttribute("position") as THREE.BufferAttribute;
+    positions.setXYZ(
+      0,
+      attacker.position.x,
+      attacker.position.y,
+      attacker.position.z,
+    );
+    positions.setXYZ(
+      1,
+      target.position.x,
+      target.position.y,
+      target.position.z,
+    );
+    positions.needsUpdate = true;
+    effect.material.color.setHex(
+      attacker.owner === "player" ? 0x8fcbd2 : 0xd7a188,
+    );
+    effect.material.opacity = effectsQuality === "high" ? 0.86 : 0.62;
+    activateCombatEffect(effect, 0.16, 1);
+  }
 
   if (effectsQuality === "high") {
     createHitFlash(target, attacker.owner);
@@ -1569,54 +1838,115 @@ function createAttackEffect(attacker: Unit, target: Unit): void {
 }
 
 function createHitFlash(target: Unit, attackerOwner: Faction): void {
-  const geometry = new THREE.IcosahedronGeometry(0.86, 1);
-  const material = new THREE.MeshBasicMaterial({
-    color: attackerOwner === "player" ? 0xbdebf0 : 0xf0ae92,
-    transparent: true,
-    opacity: 0.88,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  const flash = new THREE.Mesh(geometry, material);
-  flash.position.set(target.position.x, target.position.y, target.position.z);
-  scene.add(flash);
-  combatEffects.push({
-    object: flash,
-    geometry,
-    material,
-    ttl: 0.24,
-    maxTtl: 0.24,
-  });
+  const effect = acquireCombatEffect("burst");
+  if (!effect) {
+    return;
+  }
+  effect.material.color.setHex(
+    attackerOwner === "player" ? 0xbdebf0 : 0xf0ae92,
+  );
+  effect.material.opacity = 0.88;
+  effect.object.position.set(
+    target.position.x,
+    target.position.y,
+    target.position.z,
+  );
+  activateCombatEffect(effect, 0.24, 0.86);
 }
 
 function createImpactEffect(unit: Unit): void {
-  const geometry = new THREE.IcosahedronGeometry(2.35, 1);
-  const material = new THREE.MeshBasicMaterial({
-    color: unit.owner === "player" ? 0x8fcbd2 : 0xd7a188,
-    transparent: true,
-    opacity: 0.76,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  const impact = new THREE.Mesh(geometry, material);
-  impact.position.set(unit.position.x, unit.position.y, unit.position.z);
-  scene.add(impact);
-  combatEffects.push({
-    object: impact,
-    geometry,
-    material,
-    ttl: 0.6,
-    maxTtl: 0.6,
-  });
+  const effect = acquireCombatEffect("burst");
+  if (!effect) {
+    return;
+  }
+  effect.material.color.setHex(
+    unit.owner === "player" ? 0x8fcbd2 : 0xd7a188,
+  );
+  effect.material.opacity = 0.76;
+  effect.object.position.set(unit.position.x, unit.position.y, unit.position.z);
+  activateCombatEffect(effect, 0.6, 2.35);
 }
 
 function clearCombatEffects(): void {
-  for (const effect of combatEffects) {
-    scene.remove(effect.object);
-    effect.geometry.dispose();
-    effect.material.dispose();
+  while (combatEffects.length > 0) {
+    const effect = combatEffects.pop();
+    if (effect) {
+      releaseCombatEffect(effect);
+    }
   }
-  combatEffects.length = 0;
+}
+
+function acquireCombatEffect(kind: CombatEffectKind): CombatEffect | null {
+  const pooled = combatEffectPool[kind].pop();
+  if (pooled) {
+    return pooled;
+  }
+  if (combatEffectObjectCount >= MAX_COMBAT_EFFECTS) {
+    return null;
+  }
+
+  combatEffectObjectCount += 1;
+  if (kind === "line") {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+    ]);
+    (geometry.getAttribute("position") as THREE.BufferAttribute).setUsage(
+      THREE.DynamicDrawUsage,
+    );
+    const material = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    return {
+      kind,
+      object: new THREE.Line(geometry, material),
+      geometry,
+      material,
+      ttl: 0,
+      maxTtl: 0,
+      baseScale: 1,
+    };
+  }
+
+  const geometry = new THREE.IcosahedronGeometry(1, 1);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  return {
+    kind,
+    object: new THREE.Mesh(geometry, material),
+    geometry,
+    material,
+    ttl: 0,
+    maxTtl: 0,
+    baseScale: 1,
+  };
+}
+
+function activateCombatEffect(
+  effect: CombatEffect,
+  ttl: number,
+  baseScale: number,
+): void {
+  effect.ttl = ttl;
+  effect.maxTtl = ttl;
+  effect.baseScale = baseScale;
+  effect.object.scale.setScalar(baseScale);
+  scene.add(effect.object);
+  combatEffects.push(effect);
+}
+
+function releaseCombatEffect(effect: CombatEffect): void {
+  scene.remove(effect.object);
+  effect.material.opacity = 0;
+  combatEffectPool[effect.kind].push(effect);
 }
 
 function createTargetMarker(): THREE.Group {

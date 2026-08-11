@@ -10,7 +10,7 @@
     <main id="app" aria-label="RTS game viewport">
       <section class="hud hud--top" aria-label="Runtime status">
         <div>
-          <p class="eyebrow">RTS GAME // P5 VISUAL SYSTEMS</p>
+          <p class="eyebrow">RTS GAME // P6 PERFORMANCE RANGE</p>
           <h1>KHEPRI RANDOM ENCOUNTER</h1>
         </div>
         <div class="status-cluster">
@@ -53,6 +53,15 @@
           <button id="restart-encounter" type="button">RESTART</button>
           <button id="new-encounter" type="button">NEW SEED</button>
         </div>
+        <div class="scenario-control">
+          <label for="unit-scale">FLEET SCALE</label>
+          <select id="unit-scale">
+            <option value="">SKIRMISH</option>
+            <option value="50">50 UNITS</option>
+            <option value="100">100 UNITS</option>
+            <option value="200">200 UNITS</option>
+          </select>
+        </div>
         <div class="effects-control">
           <span>VISUAL EFFECTS</span>
           <label class="effects-switch">
@@ -78,6 +87,22 @@
           <div>
             <dt>SELECTED / QUEUED</dt>
             <dd id="command-status">0 / 0</dd>
+          </div>
+          <div>
+            <dt>VISIBLE / DETAIL</dt>
+            <dd id="visible-unit-count">0 / 0</dd>
+          </div>
+          <div>
+            <dt>SIM / RENDER</dt>
+            <dd id="frame-cost">-- / -- MS</dd>
+          </div>
+          <div>
+            <dt>LONG &gt; 33 MS</dt>
+            <dd id="long-frame-count">0</dd>
+          </div>
+          <div>
+            <dt>DRAW CALLS</dt>
+            <dd id="draw-call-count">0</dd>
           </div>
         </dl>
       </section>

@@ -10,6 +10,8 @@ export const DEFAULT_SEED = 20260810;
 export const BATTLEFIELD_RADIUS = 72;
 export const GROUND_Y = -18;
 export const SHIP_Y = GROUND_Y + 5;
+export const STRESS_UNIT_COUNTS = [50, 100, 200] as const;
+export type StressUnitCount = (typeof STRESS_UNIT_COUNTS)[number];
 
 export const SHIP_CLASSES: Record<ShipClassId, ShipClass> = {
   scout: {
@@ -52,17 +54,24 @@ export interface Encounter {
   neutrals: NeutralObject[];
 }
 
-export function createEncounter(seed: number): Encounter {
+export function createEncounter(
+  seed: number,
+  stressUnitCount?: StressUnitCount,
+): Encounter {
   const encounterRandom = createSeededRandom(seed ^ 0x9e3779b9);
-  const playerCount = 3 + Math.floor(encounterRandom() * 2);
-  const enemyCount = 3 + Math.floor(encounterRandom() * 2);
+  const playerCount = stressUnitCount
+    ? Math.ceil(stressUnitCount / 2)
+    : 3 + Math.floor(encounterRandom() * 2);
+  const enemyCount = stressUnitCount
+    ? Math.floor(stressUnitCount / 2)
+    : 3 + Math.floor(encounterRandom() * 2);
   const playerAnchor = {
-    x: -30 + encounterRandom() * 8,
-    z: 24 + encounterRandom() * 8,
+    x: stressUnitCount ? -26 : -30 + encounterRandom() * 8,
+    z: stressUnitCount ? 30 : 24 + encounterRandom() * 8,
   };
   const enemyAnchor = {
-    x: 28 - encounterRandom() * 8,
-    z: -24 - encounterRandom() * 8,
+    x: stressUnitCount ? 26 : 28 - encounterRandom() * 8,
+    z: stressUnitCount ? -30 : -24 - encounterRandom() * 8,
   };
 
   return {
@@ -97,21 +106,13 @@ function createFleet(
   const enemyPattern: ShipClassId[] = ["striker", "carrier", "scout", "striker"];
   const pattern = owner === "player" ? playerPattern : enemyPattern;
   const prefix = owner === "player" ? "p" : "e";
-  const offsets = [
-    { x: 0, z: 0 },
-    { x: -2.4, z: -4.2 },
-    { x: 2.4, z: -4.2 },
-    { x: 0, z: -8.2 },
-  ];
+  const offsets = createFleetOffsets(count);
 
   return Array.from({ length: count }, (_, index) => {
     const classId = index === 0
       ? pattern[0]
       : pattern[Math.floor(nextRandom() * pattern.length)];
-    const offset = offsets[index] ?? {
-      x: (index % 2 === 0 ? -1 : 1) * (3 + index),
-      z: -10 - index * 3,
-    };
+    const offset = offsets[index];
     const cosine = Math.cos(heading);
     const sine = Math.sin(heading);
     const x = anchor.x + offset.x * cosine + offset.z * sine;
@@ -124,6 +125,29 @@ function createFleet(
       z,
       heading,
     );
+  });
+}
+
+function createFleetOffsets(count: number): Array<{ x: number; z: number }> {
+  if (count <= 4) {
+    return [
+      { x: 0, z: 0 },
+      { x: -2.4, z: -4.2 },
+      { x: 2.4, z: -4.2 },
+      { x: 0, z: -8.2 },
+    ].slice(0, count);
+  }
+
+  const columns = Math.ceil(Math.sqrt(count));
+  return Array.from({ length: count }, (_, index) => {
+    const row = Math.floor(index / columns);
+    const rowStart = row * columns;
+    const rowCount = Math.min(columns, count - rowStart);
+    const column = index - rowStart;
+    return {
+      x: (column - (rowCount - 1) / 2) * 4.8,
+      z: -row * 5.5,
+    };
   });
 }
 
@@ -181,4 +205,3 @@ function createUnit(
     destroyed: false,
   };
 }
-

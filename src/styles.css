@@ -226,7 +226,7 @@ h1 {
 }
 
 .battle-log-panel {
-  top: 19.4rem;
+  top: 23.7rem;
   max-height: 12.5rem;
   padding: 0.7rem 0.8rem;
   overflow: hidden;
@@ -289,6 +289,7 @@ h1 {
   letter-spacing: 0.08em;
 }
 
+.scenario-control,
 .effects-control {
   display: flex;
   align-items: center;
@@ -300,6 +301,29 @@ h1 {
   color: #53676d;
   font: 700 0.43rem/1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   letter-spacing: 0.12em;
+}
+
+.scenario-control label {
+  cursor: pointer;
+}
+
+.scenario-control select {
+  min-width: 6.6rem;
+  height: 1.45rem;
+  padding: 0 1.5rem 0 0.4rem;
+  border: 1px solid rgba(108, 146, 155, 0.26);
+  border-radius: 2px;
+  color: #9eb7bd;
+  background: #0b151a;
+  font: 600 0.45rem/1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+}
+
+.scenario-control select:focus-visible {
+  border-color: rgba(118, 181, 190, 0.82);
+  outline: 1px solid rgba(118, 181, 190, 0.28);
+  outline-offset: 2px;
 }
 
 .effects-switch {
@@ -469,6 +493,11 @@ h1 {
 .fleet-list__entry--destroyed {
   color: #805b55;
   text-decoration: line-through;
+}
+
+.fleet-list__entry--summary {
+  color: #53676d;
+  font-style: italic;
 }
 
 .minimap-frame {
@@ -676,7 +705,7 @@ h1 {
   }
 
   .fleet-panel {
-    top: 19.4rem;
+    top: 23.7rem;
     right: 1rem;
     width: calc(100% - 2rem);
   }

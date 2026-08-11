@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BATTLEFIELD_RADIUS,
   createEncounter,
+  STRESS_UNIT_COUNTS,
 } from "./encounter";
 
 describe("createEncounter", () => {
@@ -30,5 +31,21 @@ describe("createEncounter", () => {
       expect(Math.abs(object.position.z)).toBeLessThanOrEqual(BATTLEFIELD_RADIUS);
     }
   });
-});
 
+  it.each(STRESS_UNIT_COUNTS)(
+    "creates a deterministic %i-unit stress encounter inside the battlefield",
+    (unitCount) => {
+      const encounter = createEncounter(20260810, unitCount);
+
+      expect(encounter).toEqual(createEncounter(20260810, unitCount));
+      expect(encounter.units).toHaveLength(unitCount);
+      expect(new Set(encounter.units.map((unit) => unit.id)).size).toBe(
+        unitCount,
+      );
+      for (const unit of encounter.units) {
+        expect(Math.abs(unit.position.x)).toBeLessThanOrEqual(BATTLEFIELD_RADIUS);
+        expect(Math.abs(unit.position.z)).toBeLessThanOrEqual(BATTLEFIELD_RADIUS);
+      }
+    },
+  );
+});
