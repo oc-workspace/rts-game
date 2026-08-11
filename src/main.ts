@@ -638,6 +638,7 @@ function updateTelemetry(now: number): void {
     "SYSTEM ONLINE · T+" + simulationTime.toFixed(1).padStart(6, "0");
   if (now - lastTacticalHudUpdate >= 100) {
     lastTacticalHudUpdate = now;
+    updateUnitCard();
     updateFleetHud();
     updateMinimap();
   }
