@@ -2,7 +2,9 @@
 
 家园风格、宇宙规模的随机模式 3D RTS 实验项目。
 
-当前已完成 P6 规模与性能阶段：固定 seed 随机遭遇、舰队控制、P5 舰船视觉、50/100/200 单位压力场景、性能仪表、远景 LOD、实例化批次和有上限的战斗特效对象池均可运行。当前舰船仍是程序化原型资产，下一阶段进入 P7 候选版验证。
+当前版本为 `v0.1.0-rc.1` 候选版。P0 至 P7 计划范围已经闭环：固定 seed 随机遭遇、舰队控制、三类舰船、战斗与胜负、战术 HUD、程序化视觉、50/100/200 单位压力场景、性能优化和候选版回归均已完成。
+
+当前定位仍是可玩的程序化 vertical slice，不是最终商业资产质量；独立 Firefox、Safari 和其他 GPU 的兼容性验证已记录为后续工作，不阻塞本候选版。
 
 ## 预览
 
@@ -17,6 +19,7 @@ npm install
 npm test
 npm run typecheck
 npm run build
+npm run smoke -- https://rts-game-dev.rococo.dev
 ```
 
 ## 文档
@@ -26,7 +29,8 @@ npm run build
 - [技术开发方案](docs/technical-solution.md)
 - [开发计划](docs/development-plan.md)
 - [开发进度](docs/progress/README.md)
+- [v0.1.0-rc.1 发布说明](docs/releases/v0.1.0-rc.1.md)
 
 ## 当前结论
 
-核心战场采用 Three.js；UI/HUD 优先使用 DOM/CSS 与 Canvas 叠加。PixiJS、Phaser 3、Phaser 4 可用于不同类型的 2D 项目或局部原型，但不作为本项目的核心 3D 引擎。
+核心战场采用 Three.js；UI/HUD 使用 DOM/CSS 与 Canvas 叠加。200 单位远景通过 LOD、实例化和有上限的特效对象池控制提交成本。PixiJS、Phaser 3、Phaser 4 不作为本项目的核心 3D 引擎。
