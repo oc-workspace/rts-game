@@ -40,7 +40,29 @@
           <span class="telemetry__label">FPS</span>
           <strong id="fps-value">--</strong>
         </div>
-        <p class="hint">LMB SELECT · SHIFT BOX/ADD · SHIFT RMB QUEUE · CTRL 1-9 GROUP · 1-9 SELECT · S STOP · P PAUSE</p>
+        <p class="hint">LMB SELECT · RMB MOVE/ATTACK · SHIFT RMB QUEUE · H HELP · S STOP · P PAUSE</p>
+      </section>
+
+      <section id="quick-start-panel" class="quick-start-panel" aria-label="Quick start guide">
+        <div class="quick-start-panel__header">
+          <div>
+            <p class="eyebrow">FIRST CONTACT // 快速上手</p>
+            <h2>HOW TO PLAY</h2>
+          </div>
+          <button id="quick-start-close" class="quick-start-panel__close" type="button" aria-label="Close quick start guide">CLOSE</button>
+        </div>
+        <p class="quick-start-panel__intro">指挥蓝色玩家舰队，摧毁红色敌方舰队。先完成下面 3 个动作，就能开始一局。</p>
+        <ol class="quick-start-steps">
+          <li><strong>SELECT / 选择</strong><span>左键点击蓝色舰船；拖拽框选多艘，Shift+左键追加选择。</span></li>
+          <li><strong>MOVE / 移动</strong><span>选中舰船后，在空白战场按鼠标右键移动。</span></li>
+          <li><strong>ATTACK / 攻击</strong><span>左键点击红色敌舰锁定目标，再按右键攻击；也可以直接右键敌舰。</span></li>
+          <li><strong>COMMAND / 指挥</strong><span>Shift+右键追加指令；S 停止，P 暂停；Ctrl+1 编组，1 召回。</span></li>
+          <li><strong>WIN / 获胜</strong><span>在左侧战斗日志观察命中和损失，消灭全部 HOSTILE 即可结束遭遇。</span></li>
+        </ol>
+        <div class="quick-start-panel__footer">
+          <span>镜头：滚轮缩放 · 中键拖拽平移 · R 重置 · 小地图点击聚焦</span>
+          <button id="help-toggle" class="help-toggle" type="button" hidden>HOW TO PLAY</button>
+        </div>
       </section>
 
       <section id="encounter-panel" class="encounter-panel" aria-label="Encounter control">
