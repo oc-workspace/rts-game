@@ -324,6 +324,7 @@ h1 {
 
 .help-toggle {
   position: absolute;
+  z-index: 5;
   top: 5.45rem;
   left: 50%;
   min-height: 1.7rem;
