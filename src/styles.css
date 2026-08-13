@@ -299,6 +299,7 @@ h1 {
 }
 
 .quick-start-steps span {
+  grid-column: 2;
   display: block;
   margin-top: 0.18rem;
   color: #81969b;
