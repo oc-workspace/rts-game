@@ -110,6 +110,9 @@ const longFrameCountValue = getElement<HTMLElement>("#long-frame-count");
 const drawCallCount = getElement<HTMLElement>("#draw-call-count");
 const minimapCanvas = getElement<HTMLCanvasElement>("#minimap");
 const selectionBox = getElement<HTMLDivElement>("#selection-box");
+const quickStartPanel = getElement<HTMLElement>("#quick-start-panel");
+const quickStartClose = getElement<HTMLButtonElement>("#quick-start-close");
+const helpToggle = getElement<HTMLButtonElement>("#help-toggle");
 const minimapContext = minimapCanvas.getContext("2d");
 
 const random = createSeededRandom(SCENE_SEED);
@@ -289,6 +292,8 @@ unitScaleSelect.addEventListener("change", handleUnitScaleChange);
 effectsQualityToggle.addEventListener("change", handleEffectsQualityChange);
 minimapCanvas.addEventListener("pointerdown", handleMinimapPointerDown);
 minimapCanvas.addEventListener("keydown", handleMinimapKeyDown);
+quickStartClose.addEventListener("click", hideQuickStart);
+helpToggle.addEventListener("click", showQuickStart);
 renderer.domElement.addEventListener("pointerdown", handlePointerDown);
 renderer.domElement.addEventListener("pointermove", handlePointerMove);
 renderer.domElement.addEventListener("pointerup", handlePointerUp);
@@ -1041,6 +1046,14 @@ function handleKeyDown(event: KeyboardEvent): void {
     stopSelectedUnits();
   }
 
+  if (key === "h") {
+    if (quickStartPanel.hidden) {
+      showQuickStart();
+    } else {
+      hideQuickStart();
+    }
+  }
+
   if (/^[1-9]$/.test(key)) {
     const groupNumber = Number(key);
     if (event.ctrlKey) {
@@ -1049,6 +1062,16 @@ function handleKeyDown(event: KeyboardEvent): void {
       selectControlGroup(groupNumber);
     }
   }
+}
+
+function hideQuickStart(): void {
+  quickStartPanel.hidden = true;
+  helpToggle.hidden = false;
+}
+
+function showQuickStart(): void {
+  quickStartPanel.hidden = false;
+  helpToggle.hidden = true;
 }
 
 function handlePointerDown(event: PointerEvent): void {
