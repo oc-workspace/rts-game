@@ -216,20 +216,68 @@ function buildScout(group: THREE.Group, materials: MaterialSet): void {
   dorsalArmor.position.set(0, 1.25, 0.45);
   group.add(dorsalArmor);
 
+  const dorsalSpine = new THREE.Mesh(
+    new THREE.BoxGeometry(0.86, 0.34, 7.2),
+    materials.panel,
+  );
+  dorsalSpine.position.set(0, 1.72, -0.55);
+  group.add(dorsalSpine);
+
+  const sensorCanopy = new THREE.Mesh(
+    new THREE.SphereGeometry(0.82, 16, 8),
+    materials.panel,
+  );
+  sensorCanopy.scale.set(1, 0.42, 1.24);
+  sensorCanopy.position.set(0, 1.96, 1.18);
+  group.add(sensorCanopy);
+
+  const sensorBand = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.1, 0.22),
+    materials.accent,
+  );
+  sensorBand.position.set(0, 2.2, 1.47);
+  group.add(sensorBand);
+
   for (const side of [-1, 1]) {
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.46, 2.2), materials.armor);
-    wing.position.set(side * 3.5, -0.5, -1.2);
-    wing.rotation.y = side * -0.22;
+    const wing = new THREE.Mesh(
+      createAngularHullGeometry(3.9, 6.4, 0.42),
+      materials.armor,
+    );
+    wing.position.set(side * 3.35, -0.42, -1.2);
+    wing.rotation.y = side * -0.18;
     group.add(wing);
+
+    const radiator = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, 0.72, 2.9),
+      materials.panel,
+    );
+    radiator.position.set(side * 2.05, 0.28, -1.62);
+    radiator.rotation.z = side * -0.12;
+    group.add(radiator);
+
+    const wingTip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.12, 2.7),
+      materials.accent,
+    );
+    wingTip.position.set(side * 4.72, -0.24, -1.64);
+    wingTip.rotation.y = side * -0.18;
+    group.add(wingTip);
 
     const strip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 5.1), materials.accent);
     strip.position.set(side * 1.45, 1.47, -0.25);
     group.add(strip);
   }
 
-  const sensor = new THREE.Mesh(new THREE.OctahedronGeometry(0.62, 0), materials.accent);
-  sensor.position.set(0, 1.88, 3.1);
+  const sensor = new THREE.Mesh(new THREE.OctahedronGeometry(0.52, 1), materials.accent);
+  sensor.position.set(0, 2.02, 3.1);
   group.add(sensor);
+
+  const sensorMast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.12, 1.1, 8),
+    materials.armor,
+  );
+  sensorMast.position.set(0, 2.48, 2.55);
+  group.add(sensorMast);
 }
 
 function buildStriker(group: THREE.Group, materials: MaterialSet): void {
