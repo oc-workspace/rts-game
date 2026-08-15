@@ -108,7 +108,7 @@ async function loadTexture(
   texture.flipY = false;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(2, 2);
+  texture.repeat.set(1, 1);
   texture.anisotropy = 4;
   if (useSrgb) {
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -120,9 +120,15 @@ function applyScoutTextures(
   materials: ScoutAssetMaterials,
   bundle: ScoutAssetBundle,
 ): void {
-  for (const material of [materials.hull, materials.armor, materials.panel]) {
+  const materialTuning: Array<[THREE.MeshStandardMaterial, number]> = [
+    [materials.hull, 0.18],
+    [materials.armor, 0.12],
+    [materials.panel, 0.2],
+  ];
+  for (const [material, lightnessOffset] of materialTuning) {
     material.map = bundle.baseColor;
     material.roughnessMap = bundle.roughness;
+    material.color.offsetHSL(0, 0, lightnessOffset);
     material.needsUpdate = true;
   }
 }
