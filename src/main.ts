@@ -279,6 +279,7 @@ const battleLogEntries: BattleLogEntry[] = [];
 runtimeStatus.textContent = "SYSTEM ONLINE";
 simulationStatus.textContent = "RUNNING";
 addBattleLog("system", "ENCOUNTER INITIALIZED · " + getEncounterSummary());
+applyInspectionPresetFromUrl();
 updateTelemetry(previousTime);
 updateUnitCard();
 renderPresentation();
@@ -1543,6 +1544,33 @@ function resetCamera(): void {
   cameraFocus.copy(initialCameraFocus);
   cameraZoom = 1;
   applyCameraTransform();
+}
+
+function applyInspectionPresetFromUrl(): void {
+  const requestedUnitId = new URLSearchParams(window.location.search)
+    .get("inspectUnit")
+    ?.trim()
+    .toLowerCase();
+  if (!requestedUnitId) {
+    return;
+  }
+  const unit = [...world.units.values()].find(
+    (candidate) =>
+      candidate.owner === "player" &&
+      candidate.id.toLowerCase() === requestedUnitId,
+  );
+  if (!unit) {
+    return;
+  }
+
+  setSelection(unit.id);
+  cameraFocus.set(unit.position.x, initialCameraFocus.y, unit.position.z);
+  cameraZoom = 0.55;
+  applyCameraTransform();
+  paused = true;
+  simulationStatus.textContent = "PAUSED";
+  world.statusMessage = "INSPECT · " + unit.id.toUpperCase();
+  addBattleLog("system", world.statusMessage);
 }
 
 function applyCameraTransform(): void {
