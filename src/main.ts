@@ -38,6 +38,7 @@ import "./styles.css";
 const FIXED_STEP = 1 / 60;
 const SCENE_SEED = readSeedFromUrl();
 const SCENE_STRESS_UNIT_COUNT = readStressUnitCountFromUrl();
+const RENDER_PIXEL_RATIO = readRenderPixelRatio();
 const LONG_FRAME_THRESHOLD_MS = 1000 / 30;
 const FLEET_LIST_LIMIT = 10;
 const MAX_SHIP_LIGHTS = 12;
@@ -140,7 +141,7 @@ try {
     antialias: true,
     powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(RENDER_PIXEL_RATIO);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1629,6 +1630,13 @@ function getEncounterUrl(seed: number): URL {
   }
   url.searchParams.delete("rev");
   return url;
+}
+
+function readRenderPixelRatio(): number {
+  const requested = Number(
+    new URLSearchParams(window.location.search).get("pixelRatio"),
+  );
+  return requested === 1 ? 1 : Math.min(window.devicePixelRatio, 2);
 }
 
 function loadEncounter(seed: number, statusMessage: string): void {
