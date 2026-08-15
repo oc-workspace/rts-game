@@ -6,6 +6,7 @@
   "scripts": {
     "assets:scout": "node scripts/build-scout-model.mjs",
     "assets:striker": "node scripts/build-striker-model.mjs",
+    "assets:carrier": "node scripts/build-carrier-model.mjs",
     "dev": "vite",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",

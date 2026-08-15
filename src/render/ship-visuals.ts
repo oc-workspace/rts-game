@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GROUND_Y, SHIP_CLASSES, SHIP_Y } from "../game/encounter";
 import type { Faction, ShipClassId, Unit } from "../game/types";
+import { installCarrierAsset } from "./carrier-asset";
 import { installScoutAsset } from "./scout-asset";
 import { installStrikerAsset } from "./striker-asset";
 
@@ -453,17 +454,20 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
 }
 
 function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
+  const fallbackCore = new THREE.Group();
+  fallbackCore.name = "carrier-procedural-fallback";
+  group.add(fallbackCore);
   const primaryHull = new THREE.Mesh(
     createAngularHullGeometry(10.8, 20.5, 4.2),
     materials.hull,
   );
   primaryHull.name = "carrier-primary-hull";
-  group.add(primaryHull);
+  fallbackCore.add(primaryHull);
 
   const spine = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.2, 17.5), materials.armor);
   spine.name = "carrier-command-spine";
   spine.position.set(0, 2.35, -0.4);
-  group.add(spine);
+  fallbackCore.add(spine);
 
   const prowArmor = new THREE.Mesh(
     createAngularHullGeometry(7.6, 6.4, 0.72),
@@ -471,7 +475,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
   );
   prowArmor.name = "carrier-prow-armor";
   prowArmor.position.set(0, 2.38, 6.45);
-  group.add(prowArmor);
+  fallbackCore.add(prowArmor);
 
   const aftDeck = new THREE.Mesh(
     createAngularHullGeometry(7.8, 4.8, 0.62),
@@ -479,7 +483,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
   );
   aftDeck.name = "carrier-aft-deck";
   aftDeck.position.set(0, 2.24, -6.25);
-  group.add(aftDeck);
+  fallbackCore.add(aftDeck);
 
   for (const side of [-1, 1]) {
     const hangar = new THREE.Mesh(
@@ -489,7 +493,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
     hangar.name = "carrier-hangar-pod";
     hangar.position.set(side * 6.3, -0.35, -1.2);
     hangar.rotation.y = side * 0.035;
-    group.add(hangar);
+    fallbackCore.add(hangar);
 
     const hangarDoor = new THREE.Mesh(
       new THREE.BoxGeometry(3.86, 0.18, 7.2),
@@ -497,7 +501,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
     );
     hangarDoor.name = "carrier-hangar-door";
     hangarDoor.position.set(side * 6.3, 1.12, -0.9);
-    group.add(hangarDoor);
+    fallbackCore.add(hangarDoor);
 
     const launchBrow = new THREE.Mesh(
       createAngularHullGeometry(4.35, 2.45, 0.48),
@@ -506,7 +510,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
     launchBrow.name = "carrier-launch-brow";
     launchBrow.position.set(side * 6.3, 1.42, 4.05);
     launchBrow.rotation.y = side * -0.035;
-    group.add(launchBrow);
+    fallbackCore.add(launchBrow);
 
     const hangarBrace = new THREE.Mesh(
       new THREE.BoxGeometry(3.98, 0.42, 0.46),
@@ -514,7 +518,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
     );
     hangarBrace.name = "carrier-hangar-brace";
     hangarBrace.position.set(side * 6.3, 1.34, -0.9);
-    group.add(hangarBrace);
+    fallbackCore.add(hangarBrace);
 
     const outerRail = new THREE.Mesh(
       new THREE.BoxGeometry(0.52, 0.86, 9.8),
@@ -522,7 +526,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
     );
     outerRail.name = "carrier-outer-armor-rail";
     outerRail.position.set(side * 8.25, 0.22, -1.25);
-    group.add(outerRail);
+    fallbackCore.add(outerRail);
 
     const radiator = new THREE.Mesh(
       new THREE.BoxGeometry(0.22, 1.55, 4.4),
@@ -531,7 +535,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
     radiator.name = "carrier-hangar-radiator";
     radiator.position.set(side * 8.57, 0.5, -3.15);
     radiator.rotation.z = side * -0.055;
-    group.add(radiator);
+    fallbackCore.add(radiator);
 
     const landingGuide = new THREE.Mesh(
       new THREE.BoxGeometry(0.3, 0.16, 3.35),
@@ -597,6 +601,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
   sensorCrown.name = "carrier-sensor-crown";
   sensorCrown.position.set(0, 8.46, 0.8);
   group.add(sensorCrown);
+  installCarrierAsset(group, fallbackCore, materials);
 }
 
 function createMaterials(palette: ShipPalette): MaterialSet {

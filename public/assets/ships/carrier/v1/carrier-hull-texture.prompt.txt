@@ -1,0 +1,10 @@
+Use case: stylized-concept
+Asset type: base-color source texture for a real-time RTS heavy carrier PBR material
+Primary request: create a square neutral hard-surface armor texture for a massive command carrier spacecraft, intended to be reduced to 512×512 and tinted by faction colors at runtime
+Style/medium: orthographic flat material texture, production game asset, industrial hard science-fiction
+Composition/framing: one continuous surface filling the square; very large elongated flight-deck plates, long longitudinal reinforcement seams, broad hangar-maintenance bands, sparse service hatches and restrained bolt groups; no perspective and no central object
+Lighting/mood: diffuse neutral studio illumination with minimal baked lighting; readable midtone separation without black shadows
+Color palette: neutral medium cool steel gray, slightly lighter deck plates, darker hangar recess bands; no saturated colors
+Materials/textures: capital-ship plating, heavier and larger-scale than scout or striker armor, low-frequency rectangular and trapezoid panels, subtle roughness and wear variation
+Constraints: no text, letters, numbers, logos, insignia, UI, spacecraft silhouette, watermark, border, frame, glow, emissive strips, cast shadows or perspective distortion; do not create a 2x2 sheet or repeated quadrants; edges should be visually compatible when wrapped
+Avoid: tiny noisy greebles, dense circuitry, small fighter-scale panels, extreme contrast, crushed black areas, bright white highlights
