@@ -39,6 +39,8 @@ const FIXED_STEP = 1 / 60;
 const SCENE_SEED = readSeedFromUrl();
 const SCENE_STRESS_UNIT_COUNT = readStressUnitCountFromUrl();
 const RENDER_PIXEL_RATIO = readRenderPixelRatio();
+const CAPTURE_FRAME_ENABLED = new URLSearchParams(window.location.search)
+  .get("captureFrame") === "1";
 const LONG_FRAME_THRESHOLD_MS = 1000 / 30;
 const FLEET_LIST_LIMIT = 10;
 const MAX_SHIP_LIGHTS = 12;
@@ -140,6 +142,7 @@ try {
   renderer = new THREE.WebGLRenderer({
     antialias: true,
     powerPreference: "high-performance",
+    preserveDrawingBuffer: CAPTURE_FRAME_ENABLED,
   });
   renderer.setPixelRatio(RENDER_PIXEL_RATIO);
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -257,6 +260,8 @@ let paused = false;
 let accumulator = 0;
 let simulationTime = 0;
 let previousTime = performance.now();
+const captureFrameReadyAt = previousTime + 4000;
+let captureFrameSaved = false;
 let frameCounter = 0;
 let fpsWindowStart = previousTime;
 let simulationWindowMs = 0;
@@ -327,9 +332,28 @@ function render(now: number): void {
   const renderStart = performance.now();
   renderPresentation();
   renderer.render(scene, camera);
+  captureRenderedFrame(now);
   renderWindowMs += performance.now() - renderStart;
   updateTelemetry(now);
   requestAnimationFrame(render);
+}
+
+function captureRenderedFrame(now: number): void {
+  if (
+    !CAPTURE_FRAME_ENABLED ||
+    captureFrameSaved ||
+    now < captureFrameReadyAt
+  ) {
+    return;
+  }
+  const image = document.createElement("img");
+  image.id = "qa-capture-frame";
+  image.hidden = true;
+  image.alt = "";
+  image.src = renderer.domElement.toDataURL("image/jpeg", 0.92);
+  document.body.append(image);
+  document.documentElement.dataset.captureFrame = "ready";
+  captureFrameSaved = true;
 }
 
 function updateSimulation(state: WorldState, step: number): void {
