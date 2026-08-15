@@ -1,0 +1,481 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "rts-game scripts/build-striker-model.mjs",
+    "extras": {
+      "coordinateSystem": "right-handed, Y-up, +Z bow",
+      "assetId": "striker-near-v1"
+    }
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "striker-near-v1",
+      "nodes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "striker-primary-hull",
+      "mesh": 0
+    },
+    {
+      "name": "striker-prow-armor",
+      "mesh": 1
+    },
+    {
+      "name": "striker-left-shoulder",
+      "mesh": 2
+    },
+    {
+      "name": "striker-right-shoulder",
+      "mesh": 3
+    },
+    {
+      "name": "striker-gun-foundations",
+      "mesh": 4
+    },
+    {
+      "name": "striker-vent-panels",
+      "mesh": 5
+    }
+  ],
+  "meshes": [
+    {
+      "name": "striker-primary-hull",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "material": 0,
+          "mode": 4
+        }
+      ],
+      "extras": {
+        "semantic": "striker-hull"
+      }
+    },
+    {
+      "name": "striker-prow-armor",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 3,
+            "NORMAL": 4,
+            "TEXCOORD_0": 5
+          },
+          "material": 1,
+          "mode": 4
+        }
+      ],
+      "extras": {
+        "semantic": "striker-armor"
+      }
+    },
+    {
+      "name": "striker-left-shoulder",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8
+          },
+          "material": 1,
+          "mode": 4
+        }
+      ],
+      "extras": {
+        "semantic": "striker-armor"
+      }
+    },
+    {
+      "name": "striker-right-shoulder",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 9,
+            "NORMAL": 10,
+            "TEXCOORD_0": 11
+          },
+          "material": 1,
+          "mode": 4
+        }
+      ],
+      "extras": {
+        "semantic": "striker-armor"
+      }
+    },
+    {
+      "name": "striker-gun-foundations",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 12,
+            "NORMAL": 13,
+            "TEXCOORD_0": 14
+          },
+          "material": 1,
+          "mode": 4
+        }
+      ],
+      "extras": {
+        "semantic": "striker-armor"
+      }
+    },
+    {
+      "name": "striker-vent-panels",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 15,
+            "NORMAL": 16,
+            "TEXCOORD_0": 17
+          },
+          "material": 2,
+          "mode": 4
+        }
+      ],
+      "extras": {
+        "semantic": "striker-panel"
+      }
+    }
+  ],
+  "materials": [
+    {
+      "name": "striker-hull",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.5,
+          0.53,
+          0.54,
+          1
+        ],
+        "metallicFactor": 0.76,
+        "roughnessFactor": 0.52
+      }
+    },
+    {
+      "name": "striker-armor",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.62,
+          0.64,
+          0.65,
+          1
+        ],
+        "metallicFactor": 0.82,
+        "roughnessFactor": 0.42
+      }
+    },
+    {
+      "name": "striker-panel",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.25,
+          0.27,
+          0.28,
+          1
+        ],
+        "metallicFactor": 0.62,
+        "roughnessFactor": 0.7
+      }
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "striker-v1.bin",
+      "byteLength": 14976
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 1152,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 1152,
+      "byteLength": 1152,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 2304,
+      "byteLength": 768,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 3072,
+      "byteLength": 864,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 3936,
+      "byteLength": 864,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 4800,
+      "byteLength": 576,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 5376,
+      "byteLength": 720,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 6096,
+      "byteLength": 720,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 6816,
+      "byteLength": 480,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 7296,
+      "byteLength": 720,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 8016,
+      "byteLength": 720,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 8736,
+      "byteLength": 480,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 9216,
+      "byteLength": 864,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 10080,
+      "byteLength": 864,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 10944,
+      "byteLength": 576,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 11520,
+      "byteLength": 1296,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 12816,
+      "byteLength": 1296,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 14112,
+      "byteLength": 864,
+      "target": 34962
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 96,
+      "type": "VEC3",
+      "min": [
+        -5.8,
+        -1.45,
+        -7.4
+      ],
+      "max": [
+        5.8,
+        1.35,
+        8.1
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 96,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 96,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 72,
+      "type": "VEC3",
+      "min": [
+        -2.4,
+        1.35,
+        -4
+      ],
+      "max": [
+        2.4,
+        2.2,
+        8.6
+      ]
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 72,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 72,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 60,
+      "type": "VEC3",
+      "min": [
+        -6.9,
+        0.2,
+        -6.3
+      ],
+      "max": [
+        -2.35,
+        1.42,
+        4.55
+      ]
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5126,
+      "count": 60,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 60,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 60,
+      "type": "VEC3",
+      "min": [
+        2.35,
+        0.2,
+        -6.3
+      ],
+      "max": [
+        6.9,
+        1.42,
+        4.55
+      ]
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 60,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5126,
+      "count": 60,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 12,
+      "componentType": 5126,
+      "count": 72,
+      "type": "VEC3",
+      "min": [
+        -4.45,
+        1.42,
+        1.2
+      ],
+      "max": [
+        4.45,
+        2.05,
+        5.35
+      ]
+    },
+    {
+      "bufferView": 13,
+      "componentType": 5126,
+      "count": 72,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 14,
+      "componentType": 5126,
+      "count": 72,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 15,
+      "componentType": 5126,
+      "count": 108,
+      "type": "VEC3",
+      "min": [
+        -6.25,
+        1.42,
+        -5.65
+      ],
+      "max": [
+        6.25,
+        2.48,
+        2.3
+      ]
+    },
+    {
+      "bufferView": 16,
+      "componentType": 5126,
+      "count": 108,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 17,
+      "componentType": 5126,
+      "count": 108,
+      "type": "VEC2"
+    }
+  ]
+}

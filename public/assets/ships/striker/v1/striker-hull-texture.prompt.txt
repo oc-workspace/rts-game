@@ -1,0 +1,10 @@
+Use case: stylized-concept
+Asset type: tileable base-color source texture for a real-time RTS gunship PBR material
+Primary request: create a square seamless neutral hard-surface armor texture for a heavy Striker attack spacecraft, intended to be reduced to 512×512 and tinted by faction colors at runtime
+Style/medium: orthographic flat material texture, production game asset, industrial hard science-fiction
+Composition/framing: one continuous seamless texture filling the square; broad low-frequency armor plates, reinforced diagonal seams, recessed maintenance channels, sparse bolt clusters and subtle abrasion; no perspective and no single central object
+Lighting/mood: diffuse neutral studio illumination baked as little as possible; readable midtone contrast without deep black shadows
+Color palette: neutral medium graphite gray, slightly cooler metal panels, a few darker structural recesses; no saturated colors
+Materials/textures: armored gunship plating, heavier and more aggressive than a scout, large panels rather than dense micro-panels, subtle roughness variation
+Constraints: perfectly tileable on all four edges; no text, letters, numbers, logos, insignia, UI, weapons, spacecraft silhouette, watermark, border, frame, glow, emissive strips, cast shadows or perspective distortion; do not create a 2x2 contact sheet or repeated quadrants
+Avoid: tiny noisy greebles, dense circuitry, photographic environment, extreme contrast, black crushed areas, bright white highlights

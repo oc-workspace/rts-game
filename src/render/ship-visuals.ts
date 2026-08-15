@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GROUND_Y, SHIP_CLASSES, SHIP_Y } from "../game/encounter";
 import type { Faction, ShipClassId, Unit } from "../game/types";
 import { installScoutAsset } from "./scout-asset";
+import { installStrikerAsset } from "./striker-asset";
 
 export type EffectsQuality = "high" | "low";
 
@@ -337,7 +338,10 @@ function buildScout(group: THREE.Group, materials: MaterialSet): void {
 }
 
 function buildStriker(group: THREE.Group, materials: MaterialSet): void {
-  group.add(
+  const fallbackCore = new THREE.Group();
+  fallbackCore.name = "striker-procedural-fallback";
+  group.add(fallbackCore);
+  fallbackCore.add(
     new THREE.Mesh(
       createAngularHullGeometry(9.4, 15.2, 3.2),
       materials.hull,
@@ -348,7 +352,7 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
     materials.armor,
   );
   prowArmor.position.set(0, 2, 2.7);
-  group.add(prowArmor);
+  fallbackCore.add(prowArmor);
 
   const centerKeel = new THREE.Mesh(
     createAngularHullGeometry(1.4, 10.6, 0.42),
@@ -356,7 +360,7 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
   );
   centerKeel.name = "striker-center-keel";
   centerKeel.position.set(0, 2.62, -0.8);
-  group.add(centerKeel);
+  fallbackCore.add(centerKeel);
 
   const commandBlister = new THREE.Mesh(
     createAngularHullGeometry(2.8, 3.4, 0.78),
@@ -381,7 +385,7 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
     );
     armorPlate.position.set(side * 3.45, 0.7, -0.8);
     armorPlate.rotation.y = side * 0.09;
-    group.add(armorPlate);
+    fallbackCore.add(armorPlate);
 
     const shoulderSponson = new THREE.Mesh(
       createAngularHullGeometry(2.6, 6.2, 1.15),
@@ -390,14 +394,14 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
     shoulderSponson.name = "striker-shoulder-sponson";
     shoulderSponson.position.set(side * 4.72, 1.08, 0.72);
     shoulderSponson.rotation.y = side * -0.08;
-    group.add(shoulderSponson);
+    fallbackCore.add(shoulderSponson);
 
     const gunMount = new THREE.Mesh(
       new THREE.CylinderGeometry(0.9, 1.15, 1, 6),
       materials.panel,
     );
     gunMount.position.set(side * 3.55, 1.3, 3.25);
-    group.add(gunMount);
+    fallbackCore.add(gunMount);
 
     const recoilBlock = new THREE.Mesh(
       new THREE.BoxGeometry(1.18, 0.72, 1.65),
@@ -405,7 +409,7 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
     );
     recoilBlock.name = "striker-recoil-block";
     recoilBlock.position.set(side * 3.55, 1.52, 2.7);
-    group.add(recoilBlock);
+    fallbackCore.add(recoilBlock);
 
     const gun = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2, 0.28, 4.8, 8),
@@ -439,12 +443,13 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
     radiator.name = "striker-side-radiator";
     radiator.position.set(side * 5.78, 0.72, -1.72);
     radiator.rotation.z = side * -0.08;
-    group.add(radiator);
+    fallbackCore.add(radiator);
   }
 
   const strip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 9.5), materials.accent);
   strip.position.set(0, 2.88, -0.9);
   group.add(strip);
+  installStrikerAsset(group, fallbackCore, materials);
 }
 
 function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
