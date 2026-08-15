@@ -1548,10 +1548,10 @@ function resetCamera(): void {
 }
 
 function applyInspectionPresetFromUrl(): void {
-  const requestedUnitId = new URLSearchParams(window.location.search)
-    .get("inspectUnit")
-    ?.trim()
-    .toLowerCase();
+  const searchParams = new URLSearchParams(window.location.search);
+  const inspectUnitId = searchParams.get("inspectUnit")?.trim().toLowerCase();
+  const captureUnitId = searchParams.get("captureUnit")?.trim().toLowerCase();
+  const requestedUnitId = captureUnitId || inspectUnitId;
   if (!requestedUnitId) {
     return;
   }
@@ -1564,13 +1564,16 @@ function applyInspectionPresetFromUrl(): void {
     return;
   }
 
-  setSelection(unit.id);
+  if (inspectUnitId) {
+    setSelection(unit.id);
+  }
   cameraFocus.set(unit.position.x, initialCameraFocus.y, unit.position.z);
-  cameraZoom = 0.55;
+  cameraZoom = captureUnitId ? 0.72 : 0.55;
   applyCameraTransform();
   paused = true;
   simulationStatus.textContent = "PAUSED";
-  world.statusMessage = "INSPECT · " + unit.id.toUpperCase();
+  world.statusMessage = (captureUnitId ? "CAPTURE · " : "INSPECT · ") +
+    unit.id.toUpperCase();
   addBattleLog("system", world.statusMessage);
 }
 
