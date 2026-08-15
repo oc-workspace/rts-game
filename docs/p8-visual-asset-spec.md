@@ -92,3 +92,14 @@ P8 第一轮以当前 200 单位压力结果为回退基线：
 - 第三轮视觉验收使用 `inspectUnit=<id>` 或无选中框的 `captureUnit=<id>` 建立确定性镜头；`pixelRatio=1` 只用于降低 QA 捕获成本，`captureFrame=1` 只在显式启用时打开 `preserveDrawingBuffer` 并导出一次画布帧，默认游戏路径不改变 WebGL buffer 策略。
 - scout base color 源图自身已包含 2×2 宏观面板，因此运行时 UV repeat 固定为 1×1；正式资源加载完成后允许对共享阵营 tint 做仅限 scout 外部资产的明度补偿，程序化回退与其他舰种材质保持不变。
 - 1280×720 正式/回退近景与 390×844 正式移动端基线均通过后，scout 资产契约可推广到 striker；推广的是 glTF、manifest、原子替换、回退开关和 QA 捕获契约，不复制 scout 的轮廓或材质数值。
+
+## 9. P8 第三轮 striker 正式资产试点
+
+Striker 复用 scout 已签核的加载和回退契约，但重新定义为宽肩、前压舰首和双炮通道。外部模型替换主舰体、舰首装甲、左右肩甲、炮座基座和散热面；指挥舱、火控传感器、炮管、炮口、registry、损伤、推进器、选择环和远景路径继续由运行时负责。
+
+- 正式模型使用 6 个语义网格、156 个三角面，原始尺寸为宽 13.8、高 3.93、长 16.0；宽长比大于 0.8，不能退化为拉长的 scout 轮廓。
+- 512×512 base color 使用单张低频大装甲面源图，roughness 由底色确定性灰度派生；运行时 UV repeat 为 1×1，阵营 tint 仅在外部 striker 资源加载后增加有限明度补偿。
+- `public/assets/ships/striker/v1/asset-manifest.json` 记录来源、权利说明、尺寸、模型/贴图哈希、25/32 近景网格预算、远景批次和程序化回退。
+- URL 可追加 `strikerAsset=fallback` 强制保留程序化核心；该参数与 `captureUnit=p-striker-03`、`pixelRatio=1`、`captureFrame=1` 组合，用于固定 seed 的正式/回退对照。
+- 正式资源必须保持双炮管和炮口坐标可读，不遮挡指挥舱、贴花和损伤层；200 单位场景继续保持 `DETAIL = 0`，不得加载近景 glTF。
+- 1280×720 正式/回退、390×844 正式移动端、console、网格预算和 200 单位性能全部通过后，契约才可继续推广到 carrier。
