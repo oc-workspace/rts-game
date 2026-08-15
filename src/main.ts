@@ -1592,7 +1592,7 @@ function applyInspectionPresetFromUrl(): void {
     setSelection(unit.id);
   }
   cameraFocus.set(unit.position.x, initialCameraFocus.y, unit.position.z);
-  cameraZoom = captureUnitId ? 0.72 : 0.55;
+  cameraZoom = captureUnitId ? 0.28 : 0.55;
   applyCameraTransform();
   paused = true;
   simulationStatus.textContent = "PAUSED";
