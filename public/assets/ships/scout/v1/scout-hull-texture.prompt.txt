@@ -1,0 +1,11 @@
+Use case: stylized-concept
+Asset type: seamless PBR base-color texture for a production 3D RTS scout spacecraft
+Primary request: create a perfectly tileable square hard-surface military spacecraft hull texture, designed as the neutral source texture for both cool-gray player and gunmetal enemy tinting
+Scene/backdrop: orthographic flat material sample filling the entire image edge to edge; seamless on all four edges
+Style/medium: realistic restrained industrial hard-sci-fi surface, production game texture, not concept art
+Composition/framing: repeating medium-scale interlocking armor plates with subtle beveled seams, sparse recessed maintenance panels, tiny fasteners and restrained wear; no single focal point
+Lighting/mood: strictly neutral albedo/base-color only, no directional lighting, no ambient occlusion, no cast shadows, no highlights, no perspective
+Color palette: neutral mid-gray and charcoal with low contrast; no faction colors
+Materials/textures: painted metal armor, subtle micro-scratches and edge wear, clean enough for a modern reconnaissance craft
+Constraints: seamless/tileable; uniform texel density; no text, letters, numbers, logos, insignia, warning stripes, decals, symbols, objects, border, watermark, signature, 3D render perspective, baked lighting, glowing elements, strong rust or grime
+Avoid: large unique panels that reveal repetition, photoreal scene lighting, blue/orange color cast, excessive damage, toy-like surfaces

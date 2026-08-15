@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GROUND_Y, SHIP_CLASSES, SHIP_Y } from "../game/encounter";
 import type { Faction, ShipClassId, Unit } from "../game/types";
+import { installScoutAsset } from "./scout-asset";
 
 export type EffectsQuality = "high" | "low";
 
@@ -254,7 +255,10 @@ function createDistantHull(
 }
 
 function buildScout(group: THREE.Group, materials: MaterialSet): void {
-  group.add(
+  const fallbackCore = new THREE.Group();
+  fallbackCore.name = "scout-procedural-fallback";
+  group.add(fallbackCore);
+  fallbackCore.add(
     new THREE.Mesh(
       createAngularHullGeometry(6.2, 13.5, 2.1),
       materials.hull,
@@ -265,14 +269,14 @@ function buildScout(group: THREE.Group, materials: MaterialSet): void {
     materials.armor,
   );
   dorsalArmor.position.set(0, 1.25, 0.45);
-  group.add(dorsalArmor);
+  fallbackCore.add(dorsalArmor);
 
   const dorsalSpine = new THREE.Mesh(
     new THREE.BoxGeometry(0.86, 0.34, 7.2),
     materials.panel,
   );
   dorsalSpine.position.set(0, 1.72, -0.55);
-  group.add(dorsalSpine);
+  fallbackCore.add(dorsalSpine);
 
   const sensorCanopy = new THREE.Mesh(
     new THREE.SphereGeometry(0.82, 16, 8),
@@ -296,7 +300,7 @@ function buildScout(group: THREE.Group, materials: MaterialSet): void {
     );
     wing.position.set(side * 3.35, -0.42, -1.2);
     wing.rotation.y = side * -0.18;
-    group.add(wing);
+    fallbackCore.add(wing);
 
     const radiator = new THREE.Mesh(
       new THREE.BoxGeometry(0.2, 0.72, 2.9),
@@ -304,7 +308,7 @@ function buildScout(group: THREE.Group, materials: MaterialSet): void {
     );
     radiator.position.set(side * 2.05, 0.28, -1.62);
     radiator.rotation.z = side * -0.12;
-    group.add(radiator);
+    fallbackCore.add(radiator);
 
     const wingTip = new THREE.Mesh(
       new THREE.BoxGeometry(0.18, 0.12, 2.7),
@@ -329,6 +333,7 @@ function buildScout(group: THREE.Group, materials: MaterialSet): void {
   );
   sensorMast.position.set(0, 2.48, 2.55);
   group.add(sensorMast);
+  installScoutAsset(group, fallbackCore, materials);
 }
 
 function buildStriker(group: THREE.Group, materials: MaterialSet): void {
