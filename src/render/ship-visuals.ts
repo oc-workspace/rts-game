@@ -46,6 +46,7 @@ interface MaterialSet {
   hull: THREE.MeshStandardMaterial;
   armor: THREE.MeshStandardMaterial;
   panel: THREE.MeshStandardMaterial;
+  glass: THREE.MeshStandardMaterial;
   accent: THREE.MeshStandardMaterial;
   engine: THREE.MeshBasicMaterial;
   engineCore: THREE.MeshBasicMaterial;
@@ -53,12 +54,62 @@ interface MaterialSet {
 
 interface SurfaceTextures {
   hull: THREE.CanvasTexture;
+  armor: THREE.CanvasTexture;
+  panel: THREE.CanvasTexture;
   roughness: THREE.CanvasTexture;
-  registry: THREE.CanvasTexture;
-  damage: THREE.CanvasTexture;
+  panelRoughness: THREE.CanvasTexture;
+  registry: Record<ShipClassId, THREE.CanvasTexture>;
+  damage: THREE.CanvasTexture[];
 }
 
 let surfaceTextures: SurfaceTextures | null = null;
+
+const REGISTRY_SPECS: Record<ShipClassId, {
+  dimensions: [number, number];
+  height: number;
+  z: number;
+  rotation: number;
+}> = {
+  scout: { dimensions: [2.8, 4.8], height: 1.74, z: -0.45, rotation: 0 },
+  striker: { dimensions: [4.2, 5.8], height: 2.6, z: -0.95, rotation: 0 },
+  carrier: { dimensions: [5.2, 8], height: 3.52, z: -0.8, rotation: 0 },
+};
+
+const DAMAGE_SPECS: Record<ShipClassId, {
+  top: number;
+  size: number;
+  positions: Array<{ x: number; z: number; rotation: number }>;
+}> = {
+  scout: {
+    top: 1.78,
+    size: 3.2,
+    positions: [
+      { x: -0.6, z: 2.25, rotation: 0.18 },
+      { x: 0.9, z: -0.8, rotation: -0.62 },
+      { x: -1.05, z: -3.15, rotation: 1.02 },
+    ],
+  },
+  striker: {
+    top: 2.64,
+    size: 4.2,
+    positions: [
+      { x: -1.6, z: 3.1, rotation: 0.12 },
+      { x: 1.8, z: -0.35, rotation: -0.58 },
+      { x: -0.7, z: -4.15, rotation: 1.08 },
+    ],
+  },
+  carrier: {
+    top: 3.58,
+    size: 5.4,
+    positions: [
+      { x: -2.8, z: 4.75, rotation: 0.1 },
+      { x: 3.2, z: -0.1, rotation: -0.7 },
+      { x: -1.9, z: -5.7, rotation: 0.92 },
+    ],
+  },
+};
+
+const DAMAGE_THRESHOLDS = [0.18, 0.42, 0.68];
 
 export function createShipVisual(unit: Unit): ShipView {
   const shipClass = SHIP_CLASSES[unit.classId];
@@ -156,14 +207,14 @@ export function updateShipVisual(
   const damage = 1 - healthRatio;
   for (let index = 0; index < view.damageOverlays.length; index += 1) {
     const overlay = view.damageOverlays[index];
-    const threshold = 0.22 + index * 0.2;
+    const threshold = DAMAGE_THRESHOLDS[index];
     overlay.visible =
       !useDistantLod && quality === "high" && damage > threshold;
     const material = overlay.material as THREE.MeshBasicMaterial;
     material.opacity = THREE.MathUtils.clamp(
-      (damage - threshold) * 1.8,
-      0.18,
-      0.78,
+      (damage - threshold) * (1.55 + index * 0.22),
+      0.16,
+      0.74,
     );
   }
 
@@ -225,7 +276,7 @@ function buildScout(group: THREE.Group, materials: MaterialSet): void {
 
   const sensorCanopy = new THREE.Mesh(
     new THREE.SphereGeometry(0.82, 16, 8),
-    materials.panel,
+    materials.glass,
   );
   sensorCanopy.scale.set(1, 0.42, 1.24);
   sensorCanopy.position.set(0, 1.96, 1.18);
@@ -304,7 +355,7 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
 
   const commandBlister = new THREE.Mesh(
     createAngularHullGeometry(2.8, 3.4, 0.78),
-    materials.panel,
+    materials.glass,
   );
   commandBlister.name = "striker-command-blister";
   commandBlister.position.set(0, 2.96, 1.55);
@@ -507,7 +558,7 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
 
   const bridgeLight = new THREE.Mesh(
     new THREE.BoxGeometry(3.2, 0.18, 0.34),
-    materials.accent,
+    materials.glass,
   );
   bridgeLight.name = "carrier-bridge-light";
   bridgeLight.position.set(0, 4.8, 4.05);
@@ -553,20 +604,29 @@ function createMaterials(palette: ShipPalette): MaterialSet {
     }),
     armor: new THREE.MeshStandardMaterial({
       color: palette.armor,
-      map: textures.hull,
+      map: textures.armor,
       roughnessMap: textures.roughness,
       emissive: 0x030405,
-      emissiveIntensity: 0.12,
-      metalness: 0.7,
-      roughness: 0.48,
+      emissiveIntensity: 0.08,
+      metalness: 0.74,
+      roughness: 0.44,
       flatShading: true,
     }),
     panel: new THREE.MeshStandardMaterial({
       color: palette.panel,
-      map: textures.hull,
-      roughnessMap: textures.roughness,
-      metalness: 0.58,
-      roughness: 0.7,
+      map: textures.panel,
+      roughnessMap: textures.panelRoughness,
+      metalness: 0.52,
+      roughness: 0.78,
+    }),
+    glass: new THREE.MeshStandardMaterial({
+      color: palette.panel,
+      map: textures.panel,
+      roughnessMap: textures.panelRoughness,
+      emissive: palette.faction,
+      emissiveIntensity: 0.34,
+      metalness: 0.8,
+      roughness: 0.2,
     }),
     accent: new THREE.MeshStandardMaterial({
       color: palette.faction,
@@ -654,48 +714,38 @@ function createSelectionRing(classId: ShipClassId, factionColor: number): THREE.
 }
 
 function createRegistryDecal(classId: ShipClassId, accent: number): THREE.Mesh {
-  const dimensions = classId === "carrier"
-    ? [5.2, 8]
-    : classId === "striker"
-      ? [4.2, 5.8]
-      : [2.8, 4.8];
+  const spec = REGISTRY_SPECS[classId];
   const decal = new THREE.Mesh(
-    new THREE.PlaneGeometry(dimensions[0], dimensions[1]),
+    new THREE.PlaneGeometry(spec.dimensions[0], spec.dimensions[1]),
     new THREE.MeshBasicMaterial({
       color: accent,
-      map: getSurfaceTextures().registry,
+      map: getSurfaceTextures().registry[classId],
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.78,
       depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -2,
       side: THREE.DoubleSide,
     }),
   );
-  decal.rotation.x = -Math.PI / 2;
-  const height = classId === "carrier" ? 3.52 : classId === "striker" ? 2.58 : 1.72;
-  decal.position.set(0, height, -0.4);
-  decal.name = "registry-decal";
+  decal.rotation.set(-Math.PI / 2, 0, spec.rotation);
+  decal.position.set(0, spec.height, spec.z);
+  decal.name = classId + "-registry-decal";
   return decal;
 }
 
 function createDamageOverlays(classId: ShipClassId): THREE.Mesh[] {
-  const top = classId === "carrier" ? 3.58 : classId === "striker" ? 2.64 : 1.78;
-  const size = classId === "carrier" ? 5.4 : classId === "striker" ? 4.2 : 3.2;
-  const positions = [
-    { x: -0.22, z: 1.4, rotation: 0.2 },
-    { x: 0.3, z: -1.6, rotation: -0.7 },
-    { x: -0.34, z: -3.4, rotation: 0.95 },
-  ];
-  return positions.map((position, index) => {
+  const spec = DAMAGE_SPECS[classId];
+  const textures = getSurfaceTextures().damage;
+  return spec.positions.map((position, index) => {
     const overlay = new THREE.Mesh(
       new THREE.PlaneGeometry(
-        size * (1 - index * 0.12),
-        size * (1 - index * 0.12),
+        spec.size * (1 - index * 0.12),
+        spec.size * (1 - index * 0.12),
       ),
       new THREE.MeshBasicMaterial({
-        color: 0x16110f,
-        map: getSurfaceTextures().damage,
+        color: index === 0 ? 0x2a1711 : index === 1 ? 0x1c100d : 0x111315,
+        map: textures[index],
         transparent: true,
         opacity: 0,
         depthWrite: false,
@@ -705,9 +755,9 @@ function createDamageOverlays(classId: ShipClassId): THREE.Mesh[] {
       }),
     );
     overlay.rotation.set(-Math.PI / 2, 0, position.rotation);
-    overlay.position.set(position.x * size, top + index * 0.015, position.z);
+    overlay.position.set(position.x, spec.top + index * 0.015, position.z);
     overlay.visible = false;
-    overlay.name = "damage-overlay-" + index;
+    overlay.name = classId + "-damage-stage-" + (index + 1);
     return overlay;
   });
 }
@@ -764,6 +814,64 @@ function getSurfaceTextures(): SurfaceTextures {
         context.fillRect(x, y, 1, 1);
       }
     }),
+    armor: createCanvasTexture(128, (context, size) => {
+      context.fillStyle = "#9ea6a7";
+      context.fillRect(0, 0, size, size);
+      context.strokeStyle = "rgba(24, 31, 33, 0.46)";
+      context.lineWidth = 2;
+      for (let row = 0; row < 4; row += 1) {
+        const y = 12 + row * 32;
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(20 + (row % 2) * 10, y);
+        context.lineTo(32 + (row % 2) * 10, y + 8);
+        context.lineTo(78 + (row % 2) * 10, y + 8);
+        context.lineTo(90 + (row % 2) * 10, y);
+        context.lineTo(size, y);
+        context.stroke();
+      }
+      context.fillStyle = "rgba(24, 30, 32, 0.48)";
+      for (let index = 0; index < 32; index += 1) {
+        context.beginPath();
+        context.arc(
+          8 + ((index * 37) % 112),
+          8 + ((index * 61) % 112),
+          1.1,
+          0,
+          Math.PI * 2,
+        );
+        context.fill();
+      }
+      context.strokeStyle = "rgba(240, 244, 244, 0.12)";
+      context.lineWidth = 1;
+      context.strokeRect(4.5, 4.5, size - 9, size - 9);
+    }),
+    panel: createCanvasTexture(128, (context, size) => {
+      context.fillStyle = "#7f898b";
+      context.fillRect(0, 0, size, size);
+      for (let offset = 0; offset < size; offset += 16) {
+        context.fillStyle = offset % 32 === 0
+          ? "rgba(24, 30, 31, 0.42)"
+          : "rgba(236, 241, 241, 0.08)";
+        context.fillRect(offset, 0, 3, size);
+      }
+      context.strokeStyle = "rgba(24, 31, 33, 0.5)";
+      context.lineWidth = 1;
+      for (let row = 0; row < 6; row += 1) {
+        const y = 10 + row * 20;
+        context.beginPath();
+        context.moveTo(7, y);
+        context.lineTo(53, y);
+        context.moveTo(70, y + 5);
+        context.lineTo(120, y + 5);
+        context.stroke();
+      }
+      context.fillStyle = "rgba(10, 14, 15, 0.5)";
+      for (let index = 0; index < 8; index += 1) {
+        context.fillRect(16 + index * 12, 56, 7, 3);
+        context.fillRect(16 + index * 12, 64, 7, 2);
+      }
+    }),
     roughness: createCanvasTexture(128, (context, size) => {
       context.fillStyle = "#b8b8b8";
       context.fillRect(0, 0, size, size);
@@ -773,54 +881,147 @@ function getSurfaceTextures(): SurfaceTextures {
         context.fillRect((index * 53) % size, (index * 97) % size, 1, 1);
       }
     }),
-    registry: createCanvasTexture(128, (context, size) => {
-      context.clearRect(0, 0, size, size);
-      context.fillStyle = "rgba(255, 255, 255, 0.92)";
-      context.fillRect(13, 11, 5, 48);
-      context.fillRect(23, 11, 2, 48);
-      context.fillRect(13, 66, 58, 3);
-      context.fillRect(13, 75, 37, 2);
-      context.font = "700 13px monospace";
-      context.fillText("KHEPRI", 34, 27);
-      context.font = "700 9px monospace";
-      context.fillText("NAVAL // 07", 34, 44);
-      context.strokeStyle = "rgba(255, 255, 255, 0.7)";
-      context.strokeRect(91.5, 10.5, 22, 22);
-      context.beginPath();
-      context.moveTo(92, 33);
-      context.lineTo(113, 11);
-      context.stroke();
-    }),
-    damage: createCanvasTexture(128, (context, size) => {
-      context.clearRect(0, 0, size, size);
-      const gradient = context.createRadialGradient(64, 64, 3, 64, 64, 58);
-      gradient.addColorStop(0, "rgba(5, 2, 1, 0.98)");
-      gradient.addColorStop(0.26, "rgba(38, 13, 8, 0.8)");
-      gradient.addColorStop(0.58, "rgba(20, 13, 10, 0.34)");
-      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-      context.fillStyle = gradient;
+    panelRoughness: createCanvasTexture(128, (context, size) => {
+      context.fillStyle = "#d0d0d0";
       context.fillRect(0, 0, size, size);
-      context.strokeStyle = "rgba(7, 3, 2, 0.92)";
-      context.lineWidth = 3;
-      for (let branch = 0; branch < 7; branch += 1) {
-        const angle = branch * 2.41;
-        context.beginPath();
-        context.moveTo(64, 64);
-        context.lineTo(64 + Math.cos(angle) * 24, 64 + Math.sin(angle) * 24);
-        context.lineTo(64 + Math.cos(angle + 0.18) * 47, 64 + Math.sin(angle + 0.18) * 47);
-        context.stroke();
+      for (let offset = 0; offset < size; offset += 16) {
+        const shade = offset % 32 === 0 ? 112 : 176;
+        context.fillStyle = `rgb(${shade}, ${shade}, ${shade})`;
+        context.fillRect(offset, 0, 4, size);
       }
     }),
+    registry: {
+      scout: createRegistryTexture("scout"),
+      striker: createRegistryTexture("striker"),
+      carrier: createRegistryTexture("carrier"),
+    },
+    damage: [
+      createDamageTexture(0),
+      createDamageTexture(1),
+      createDamageTexture(2),
+    ],
   };
   surfaceTextures.hull.colorSpace = THREE.SRGBColorSpace;
-  surfaceTextures.registry.colorSpace = THREE.SRGBColorSpace;
-  surfaceTextures.registry.wrapS = THREE.ClampToEdgeWrapping;
-  surfaceTextures.registry.wrapT = THREE.ClampToEdgeWrapping;
-  surfaceTextures.registry.repeat.set(1, 1);
-  surfaceTextures.damage.wrapS = THREE.ClampToEdgeWrapping;
-  surfaceTextures.damage.wrapT = THREE.ClampToEdgeWrapping;
-  surfaceTextures.damage.repeat.set(1, 1);
+  surfaceTextures.armor.colorSpace = THREE.SRGBColorSpace;
+  surfaceTextures.panel.colorSpace = THREE.SRGBColorSpace;
+  for (const texture of Object.values(surfaceTextures.registry)) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.repeat.set(1, 1);
+  }
+  for (const texture of surfaceTextures.damage) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.repeat.set(1, 1);
+  }
   return surfaceTextures;
+}
+
+function createRegistryTexture(classId: ShipClassId): THREE.CanvasTexture {
+  const labels: Record<ShipClassId, { code: string; role: string }> = {
+    scout: { code: "SC-01", role: "RECON" },
+    striker: { code: "ST-02", role: "LINE" },
+    carrier: { code: "CV-03", role: "COMMAND" },
+  };
+  const label = labels[classId];
+  return createCanvasTexture(128, (context, size) => {
+    context.clearRect(0, 0, size, size);
+    context.fillStyle = "rgba(255, 255, 255, 0.94)";
+    context.fillRect(10, 10, 5, 52);
+    context.fillRect(20, 10, 2, 52);
+    context.fillRect(10, 69, 64, 3);
+    context.fillRect(10, 78, 42, 2);
+    context.font = "700 13px monospace";
+    context.fillText("KHEPRI", 31, 25);
+    context.font = "700 10px monospace";
+    context.fillText(label.code, 31, 42);
+    context.font = "700 8px monospace";
+    context.fillText(label.role, 31, 56);
+    context.strokeStyle = "rgba(255, 255, 255, 0.76)";
+    context.lineWidth = 1.5;
+    context.strokeRect(91.5, 9.5, 25, 25);
+    context.beginPath();
+    if (classId === "scout") {
+      context.moveTo(96, 29);
+      context.lineTo(104, 14);
+      context.lineTo(112, 29);
+    } else if (classId === "striker") {
+      context.arc(104, 22, 7, 0, Math.PI * 2);
+      context.moveTo(104, 12);
+      context.lineTo(104, 32);
+      context.moveTo(94, 22);
+      context.lineTo(114, 22);
+    } else {
+      context.moveTo(96, 15);
+      context.lineTo(112, 15);
+      context.lineTo(112, 29);
+      context.lineTo(96, 29);
+      context.closePath();
+      context.moveTo(104, 12);
+      context.lineTo(104, 32);
+    }
+    context.stroke();
+  });
+}
+
+function createDamageTexture(stage: number): THREE.CanvasTexture {
+  return createCanvasTexture(128, (context, size) => {
+    context.clearRect(0, 0, size, size);
+    const centerX = stage === 1 ? 70 : stage === 2 ? 58 : 64;
+    const centerY = stage === 1 ? 56 : stage === 2 ? 68 : 64;
+    const gradient = context.createRadialGradient(
+      centerX,
+      centerY,
+      stage === 2 ? 7 : 3,
+      centerX,
+      centerY,
+      58,
+    );
+    gradient.addColorStop(0, "rgba(3, 2, 2, 0.98)");
+    gradient.addColorStop(0.24, stage === 0
+      ? "rgba(65, 24, 12, 0.88)"
+      : "rgba(30, 17, 14, 0.9)");
+    gradient.addColorStop(0.58, "rgba(18, 15, 13, 0.38)");
+    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+
+    if (stage === 2) {
+      context.fillStyle = "rgba(2, 3, 3, 0.96)";
+      context.beginPath();
+      context.moveTo(centerX - 11, centerY - 3);
+      context.lineTo(centerX - 4, centerY - 13);
+      context.lineTo(centerX + 9, centerY - 8);
+      context.lineTo(centerX + 13, centerY + 5);
+      context.lineTo(centerX + 2, centerY + 14);
+      context.lineTo(centerX - 12, centerY + 8);
+      context.closePath();
+      context.fill();
+    }
+
+    context.strokeStyle = stage === 0
+      ? "rgba(18, 6, 3, 0.94)"
+      : "rgba(4, 5, 5, 0.96)";
+    context.lineWidth = stage === 2 ? 2.6 : 2;
+    const branches = 6 + stage * 2;
+    for (let branch = 0; branch < branches; branch += 1) {
+      const angle = branch * (2.15 + stage * 0.13);
+      const reach = 30 + ((branch * 13 + stage * 7) % 22);
+      context.beginPath();
+      context.moveTo(centerX, centerY);
+      context.lineTo(
+        centerX + Math.cos(angle) * reach * 0.48,
+        centerY + Math.sin(angle) * reach * 0.48,
+      );
+      context.lineTo(
+        centerX + Math.cos(angle + 0.16) * reach,
+        centerY + Math.sin(angle + 0.16) * reach,
+      );
+      context.stroke();
+    }
+  });
 }
 
 function createCanvasTexture(
