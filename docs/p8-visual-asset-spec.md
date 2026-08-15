@@ -89,3 +89,6 @@ P8 第一轮以当前 200 单位压力结果为回退基线：
 - glTF loader 使用异步分包；资源全部加载成功后才原子替换程序化核心，任一模型、buffer 或贴图失败时必须继续显示现有程序化 scout。
 - 固定 seed URL 可追加 `scoutAsset=fallback` 强制使用程序化近景资产，用于正式资产与回退路径的确定性对照；该参数不得改变 simulation、单位 ID、LOD 或实例映射。
 - 正式资源启用后，scout 近景保持不超过 24 个渲染网格；远景 hull 与 200 单位实例批次不加载 glTF 或新增贴图采样种类。
+- 第三轮视觉验收使用 `inspectUnit=<id>` 或无选中框的 `captureUnit=<id>` 建立确定性镜头；`pixelRatio=1` 只用于降低 QA 捕获成本，`captureFrame=1` 只在显式启用时打开 `preserveDrawingBuffer` 并导出一次画布帧，默认游戏路径不改变 WebGL buffer 策略。
+- scout base color 源图自身已包含 2×2 宏观面板，因此运行时 UV repeat 固定为 1×1；正式资源加载完成后允许对共享阵营 tint 做仅限 scout 外部资产的明度补偿，程序化回退与其他舰种材质保持不变。
+- 1280×720 正式/回退近景与 390×844 正式移动端基线均通过后，scout 资产契约可推广到 striker；推广的是 glTF、manifest、原子替换、回退开关和 QA 捕获契约，不复制 scout 的轮廓或材质数值。
