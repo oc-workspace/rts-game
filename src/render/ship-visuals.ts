@@ -392,21 +392,40 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
 }
 
 function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
-  group.add(
-    new THREE.Mesh(
-      createAngularHullGeometry(10.8, 20.5, 4.2),
-      materials.hull,
-    ),
+  const primaryHull = new THREE.Mesh(
+    createAngularHullGeometry(10.8, 20.5, 4.2),
+    materials.hull,
   );
+  primaryHull.name = "carrier-primary-hull";
+  group.add(primaryHull);
+
   const spine = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.2, 17.5), materials.armor);
+  spine.name = "carrier-command-spine";
   spine.position.set(0, 2.35, -0.4);
   group.add(spine);
+
+  const prowArmor = new THREE.Mesh(
+    createAngularHullGeometry(7.6, 6.4, 0.72),
+    materials.armor,
+  );
+  prowArmor.name = "carrier-prow-armor";
+  prowArmor.position.set(0, 2.38, 6.45);
+  group.add(prowArmor);
+
+  const aftDeck = new THREE.Mesh(
+    createAngularHullGeometry(7.8, 4.8, 0.62),
+    materials.panel,
+  );
+  aftDeck.name = "carrier-aft-deck";
+  aftDeck.position.set(0, 2.24, -6.25);
+  group.add(aftDeck);
 
   for (const side of [-1, 1]) {
     const hangar = new THREE.Mesh(
       createAngularHullGeometry(3.8, 13.2, 2.8),
       materials.armor,
     );
+    hangar.name = "carrier-hangar-pod";
     hangar.position.set(side * 6.3, -0.35, -1.2);
     hangar.rotation.y = side * 0.035;
     group.add(hangar);
@@ -415,13 +434,57 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
       new THREE.BoxGeometry(3.86, 0.18, 7.2),
       materials.panel,
     );
+    hangarDoor.name = "carrier-hangar-door";
     hangarDoor.position.set(side * 6.3, 1.12, -0.9);
     group.add(hangarDoor);
+
+    const launchBrow = new THREE.Mesh(
+      createAngularHullGeometry(4.35, 2.45, 0.48),
+      materials.armor,
+    );
+    launchBrow.name = "carrier-launch-brow";
+    launchBrow.position.set(side * 6.3, 1.42, 4.05);
+    launchBrow.rotation.y = side * -0.035;
+    group.add(launchBrow);
+
+    const hangarBrace = new THREE.Mesh(
+      new THREE.BoxGeometry(3.98, 0.42, 0.46),
+      materials.hull,
+    );
+    hangarBrace.name = "carrier-hangar-brace";
+    hangarBrace.position.set(side * 6.3, 1.34, -0.9);
+    group.add(hangarBrace);
+
+    const outerRail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.52, 0.86, 9.8),
+      materials.armor,
+    );
+    outerRail.name = "carrier-outer-armor-rail";
+    outerRail.position.set(side * 8.25, 0.22, -1.25);
+    group.add(outerRail);
+
+    const radiator = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 1.55, 4.4),
+      materials.panel,
+    );
+    radiator.name = "carrier-hangar-radiator";
+    radiator.position.set(side * 8.57, 0.5, -3.15);
+    radiator.rotation.z = side * -0.055;
+    group.add(radiator);
+
+    const landingGuide = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.16, 3.35),
+      materials.accent,
+    );
+    landingGuide.name = "carrier-landing-guide";
+    landingGuide.position.set(side * 6.3, 1.28, 2.15);
+    group.add(landingGuide);
 
     const stripe = new THREE.Mesh(
       new THREE.BoxGeometry(0.22, 0.16, 10.5),
       materials.accent,
     );
+    stripe.name = "carrier-faction-stripe";
     stripe.position.set(side * 4.95, 2.25, -0.4);
     group.add(stripe);
   }
@@ -430,22 +493,49 @@ function buildCarrier(group: THREE.Group, materials: MaterialSet): void {
     createAngularHullGeometry(4.6, 5.2, 2.1),
     materials.panel,
   );
+  commandDeck.name = "carrier-command-deck";
   commandDeck.position.set(0, 4.35, 1.45);
   group.add(commandDeck);
+
+  const commandTower = new THREE.Mesh(
+    createAngularHullGeometry(2.8, 3.15, 1.18),
+    materials.armor,
+  );
+  commandTower.name = "carrier-command-tower";
+  commandTower.position.set(0, 5.72, 1.6);
+  group.add(commandTower);
 
   const bridgeLight = new THREE.Mesh(
     new THREE.BoxGeometry(3.2, 0.18, 0.34),
     materials.accent,
   );
+  bridgeLight.name = "carrier-bridge-light";
   bridgeLight.position.set(0, 4.8, 4.05);
   group.add(bridgeLight);
+
+  const sensorBar = new THREE.Mesh(
+    new THREE.BoxGeometry(4.2, 0.2, 0.38),
+    materials.accent,
+  );
+  sensorBar.name = "carrier-sensor-bar";
+  sensorBar.position.set(0, 6.28, 2.42);
+  group.add(sensorBar);
 
   const antenna = new THREE.Mesh(
     new THREE.CylinderGeometry(0.12, 0.18, 3.4, 8),
     materials.armor,
   );
+  antenna.name = "carrier-antenna-mast";
   antenna.position.set(0, 6.7, 0.8);
   group.add(antenna);
+
+  const sensorCrown = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.46, 0),
+    materials.accent,
+  );
+  sensorCrown.name = "carrier-sensor-crown";
+  sensorCrown.position.set(0, 8.46, 0.8);
+  group.add(sensorCrown);
 }
 
 function createMaterials(palette: ShipPalette): MaterialSet {
