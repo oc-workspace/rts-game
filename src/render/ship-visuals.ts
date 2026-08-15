@@ -294,6 +294,30 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
   prowArmor.position.set(0, 2, 2.7);
   group.add(prowArmor);
 
+  const centerKeel = new THREE.Mesh(
+    createAngularHullGeometry(1.4, 10.6, 0.42),
+    materials.panel,
+  );
+  centerKeel.name = "striker-center-keel";
+  centerKeel.position.set(0, 2.62, -0.8);
+  group.add(centerKeel);
+
+  const commandBlister = new THREE.Mesh(
+    createAngularHullGeometry(2.8, 3.4, 0.78),
+    materials.panel,
+  );
+  commandBlister.name = "striker-command-blister";
+  commandBlister.position.set(0, 2.96, 1.55);
+  group.add(commandBlister);
+
+  const fireDirector = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.38, 0),
+    materials.accent,
+  );
+  fireDirector.name = "striker-fire-director";
+  fireDirector.position.set(0, 3.5, 2.12);
+  group.add(fireDirector);
+
   for (const side of [-1, 1]) {
     const armorPlate = new THREE.Mesh(
       createAngularHullGeometry(4.4, 8.6, 0.72),
@@ -303,12 +327,29 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
     armorPlate.rotation.y = side * 0.09;
     group.add(armorPlate);
 
+    const shoulderSponson = new THREE.Mesh(
+      createAngularHullGeometry(2.6, 6.2, 1.15),
+      materials.armor,
+    );
+    shoulderSponson.name = "striker-shoulder-sponson";
+    shoulderSponson.position.set(side * 4.72, 1.08, 0.72);
+    shoulderSponson.rotation.y = side * -0.08;
+    group.add(shoulderSponson);
+
     const gunMount = new THREE.Mesh(
       new THREE.CylinderGeometry(0.9, 1.15, 1, 6),
       materials.panel,
     );
     gunMount.position.set(side * 3.55, 1.3, 3.25);
     group.add(gunMount);
+
+    const recoilBlock = new THREE.Mesh(
+      new THREE.BoxGeometry(1.18, 0.72, 1.65),
+      materials.armor,
+    );
+    recoilBlock.name = "striker-recoil-block";
+    recoilBlock.position.set(side * 3.55, 1.52, 2.7);
+    group.add(recoilBlock);
 
     const gun = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2, 0.28, 4.8, 8),
@@ -318,6 +359,15 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
     gun.position.set(side * 3.55, 1.45, 5.25);
     group.add(gun);
 
+    const barrelShroud = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.48, 1.45, 8),
+      materials.armor,
+    );
+    barrelShroud.name = "striker-barrel-shroud";
+    barrelShroud.rotation.x = Math.PI / 2;
+    barrelShroud.position.set(side * 3.55, 1.45, 4.12);
+    group.add(barrelShroud);
+
     const muzzle = new THREE.Mesh(
       new THREE.CylinderGeometry(0.24, 0.24, 0.2, 8),
       materials.accent,
@@ -325,10 +375,19 @@ function buildStriker(group: THREE.Group, materials: MaterialSet): void {
     muzzle.rotation.x = Math.PI / 2;
     muzzle.position.set(side * 3.55, 1.45, 7.66);
     group.add(muzzle);
+
+    const radiator = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.82, 3.5),
+      materials.panel,
+    );
+    radiator.name = "striker-side-radiator";
+    radiator.position.set(side * 5.78, 0.72, -1.72);
+    radiator.rotation.z = side * -0.08;
+    group.add(radiator);
   }
 
   const strip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 9.5), materials.accent);
-  strip.position.set(0, 2.58, -0.4);
+  strip.position.set(0, 2.88, -0.9);
   group.add(strip);
 }
 
