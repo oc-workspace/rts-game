@@ -12,6 +12,7 @@ describe("scout near asset manifest", () => {
       manifest.runtime.nearDetailMeshBudget,
     );
     expect(manifest.runtime.fallback).toContain("procedural");
+    expect(manifest.runtime.debugOverride).toContain("scoutAsset=fallback");
   });
 
   it("records color and roughness bitmap provenance", () => {

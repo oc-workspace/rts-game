@@ -54,6 +54,7 @@
     "distantLod": "Existing procedural distant hull",
     "stressBatch": "Existing faction x class instanced batch",
     "fallback": "Existing procedural scout core remains visible until all glTF and bitmap resources load; any load failure keeps the fallback active.",
+    "debugOverride": "Append scoutAsset=fallback to the encounter URL to force the procedural near-detail asset without changing simulation state.",
     "sharedSystems": [
       "sensor modules",
       "registry decal",

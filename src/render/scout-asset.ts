@@ -28,6 +28,10 @@ export function installScoutAsset(
 ): void {
   detailGroup.userData.assetId = SCOUT_ASSET_ID;
   detailGroup.userData.assetMode = "procedural-fallback";
+  if (isScoutFallbackForced()) {
+    detailGroup.userData.assetMode = "forced-procedural-fallback";
+    return;
+  }
 
   void loadScoutAsset().then((bundle) => {
     if (!bundle || !detailGroup.parent?.parent) {
@@ -52,6 +56,11 @@ export function installScoutAsset(
     detailGroup.userData.assetMode = "external-pbr";
     detailGroup.userData.assetMeshCount = importedMeshes.length;
   });
+}
+
+function isScoutFallbackForced(): boolean {
+  return new URLSearchParams(window.location.search).get("scoutAsset") ===
+    "fallback";
 }
 
 function loadScoutAsset(): Promise<ScoutAssetBundle | null> {
