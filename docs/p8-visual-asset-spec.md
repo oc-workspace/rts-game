@@ -114,3 +114,14 @@ Carrier 复用 scout/striker 已签核的加载、manifest、回退和 QA 契约
 - URL 可追加 `carrierAsset=fallback` 强制程序化核心；固定 QA 使用 `captureUnit=p-carrier-04`，Carrier 捕获缩放为 0.36，Scout/Striker 继续为 0.28，正常游戏摄像机不受影响。
 - 正式资产不得遮挡指挥塔、桥灯、着舰引导、registry、损伤层和三组推进器；200 单位场景继续保持 `DETAIL = 0`，不加载近景 glTF。
 - 正式/回退桌面、390×844、console、42 网格预算、资产 HTTP 和 200 单位性能全部通过后，三舰种第三轮正式资产替换才可整体签核。
+
+## 11. P8 第四轮环境视觉基线
+
+第四轮不再通过增加环境网格或后处理通道追求“更亮”，而是把既有程序化环境收敛成可验证的层级与预算契约。实现集中在 `src/render/environment-visuals.ts`，运行时由 `src/main.ts` 使用。
+
+- 背景分为星场、空间尘埃、远景行星三层，renderOrder 固定为 `-30/-20/-10`；三层均 `depthWrite=false`，不向舰船、网格或标记写入深度。范围网格为 `-2`，小行星为 `10`，目标标记为 `30`，战斗反馈为 `40`。
+- 小行星最多 10 个，主体使用低饱和 `MeshStandardMaterial`（roughness 0.82、metalness 0.48、emissive 强度 0.12），晶面保持 roughness 0.76、metalness 0.58；不新增独立贴图采样。
+- 目标标记保持 3 个绘制对象以内，地面偏移固定为 `GROUND_Y + 0.12`；环和括号使用 `MeshBasicMaterial`、加法混合、`depthTest=false/depthWrite=false`，保证不被舰体或网格吞掉。
+- 战斗反馈沿用线路/爆发对象池，总池上限 256；高特效最多 96 个活动对象，低特效最多 48 个活动对象。线路、爆发统一 `renderOrder=40`，不写入深度；低特效仍保留武器轨迹，命中闪光只在高特效启用。
+- 后处理预算为 0 个额外 pass，沿用 ACESFilmicToneMapping 与 exposure 1.08；全场加法叠加层不超过 3 类（星场、空间尘埃、标记/反馈复用现有层级）。
+- 固定 seed `20260810` 的桌面、390×844 移动端、高/低特效及 200 单位压力场景必须保留无控制台错误；200 单位仍要求 `DETAIL=0`，不加载环境之外的近景 glTF。

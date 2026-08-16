@@ -33,6 +33,11 @@ import {
   updateShipVisual,
 } from "./render/ship-visuals";
 import type { EffectsQuality, ShipView } from "./render/ship-visuals";
+import {
+  ENVIRONMENT_RENDER_ORDER,
+  ENVIRONMENT_VISUAL_BASELINE,
+  getCombatEffectActiveBudget,
+} from "./render/environment-visuals";
 import "./styles.css";
 
 const FIXED_STEP = 1 / 60;
@@ -47,7 +52,8 @@ const MAX_SHIP_LIGHTS = 12;
 const DEFAULT_DETAIL_DISTANCE = 180;
 const STRESS_DETAIL_DISTANCE = 105;
 const SHIP_CLASS_IDS: ShipClassId[] = ["scout", "striker", "carrier"];
-const MAX_COMBAT_EFFECTS = 256;
+const MAX_COMBAT_EFFECTS =
+  ENVIRONMENT_VISUAL_BASELINE.combatFeedback.objectPoolLimit;
 
 type CombatEffectKind = "line" | "burst";
 
@@ -120,8 +126,11 @@ const minimapContext = minimapCanvas.getContext("2d");
 
 const random = createSeededRandom(SCENE_SEED);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x04090e);
-scene.fog = new THREE.FogExp2(0x04090e, 0.00022);
+scene.background = new THREE.Color(ENVIRONMENT_VISUAL_BASELINE.background.clearColor);
+scene.fog = new THREE.FogExp2(
+  ENVIRONMENT_VISUAL_BASELINE.background.fogColor,
+  ENVIRONMENT_VISUAL_BASELINE.background.fogDensity,
+);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 12000);
 const initialCameraFocus = new THREE.Vector3(4, -10, 0);
@@ -148,7 +157,7 @@ try {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = ENVIRONMENT_VISUAL_BASELINE.postProcess.toneMappingExposure;
   renderer.domElement.setAttribute("aria-label", "3D deep space test range");
   app.append(renderer.domElement);
 } catch (error) {
@@ -178,13 +187,22 @@ const warmFill = new THREE.DirectionalLight(0x8b756c, 1.0);
 warmFill.position.set(-70, 8, -80);
 scene.add(warmFill);
 
-const starfield = createStarfield(random, 1700);
+const starfield = createStarfield(
+  random,
+  ENVIRONMENT_VISUAL_BASELINE.background.starCount,
+);
+starfield.renderOrder = ENVIRONMENT_RENDER_ORDER.starfield;
 scene.add(starfield);
 
-const spaceDust = createSpaceDust(random, 260);
+const spaceDust = createSpaceDust(
+  random,
+  ENVIRONMENT_VISUAL_BASELINE.background.dustCount,
+);
+spaceDust.renderOrder = ENVIRONMENT_RENDER_ORDER.spaceDust;
 scene.add(spaceDust);
 
 const distantPlanet = createDistantPlanet();
+distantPlanet.renderOrder = ENVIRONMENT_RENDER_ORDER.distantPlanet;
 scene.add(distantPlanet);
 
 const rangeGrid = new THREE.PolarGridHelper(
@@ -201,6 +219,7 @@ const rangeGridMaterial = Array.isArray(rangeGrid.material)
   : rangeGrid.material;
 rangeGridMaterial.transparent = true;
 rangeGridMaterial.opacity = 0.2;
+rangeGrid.renderOrder = ENVIRONMENT_RENDER_ORDER.rangeGrid;
 scene.add(rangeGrid);
 
 const beacon = createNavigationBeacon();
@@ -210,6 +229,7 @@ const beaconOuterRing = beacon.getObjectByName("beacon-outer-ring");
 
 const targetMarker = createTargetMarker();
 targetMarker.visible = false;
+targetMarker.renderOrder = ENVIRONMENT_RENDER_ORDER.targetMarker;
 scene.add(targetMarker);
 
 const world = createWorldState();
@@ -657,7 +677,11 @@ function updateTargetMarker(): void {
   if (selected.targetUnitId) {
     const target = world.units.get(selected.targetUnitId);
     if (target && !target.destroyed) {
-      targetMarker.position.set(target.position.x, GROUND_Y + 0.12, target.position.z);
+      targetMarker.position.set(
+        target.position.x,
+        GROUND_Y + ENVIRONMENT_VISUAL_BASELINE.targetMarker.groundOffset,
+        target.position.z,
+      );
       targetMarker.visible = true;
       return;
     }
@@ -666,7 +690,7 @@ function updateTargetMarker(): void {
   if (selected.targetPosition) {
     targetMarker.position.set(
       selected.targetPosition.x,
-      GROUND_Y + 0.12,
+      GROUND_Y + ENVIRONMENT_VISUAL_BASELINE.targetMarker.groundOffset,
       selected.targetPosition.z,
     );
     targetMarker.visible = true;
@@ -1828,6 +1852,7 @@ function createWorldState(): WorldState {
 function createNeutralView(neutral: NeutralObject): THREE.Group {
   const group = new THREE.Group();
   group.name = neutral.id + "-view";
+  group.renderOrder = ENVIRONMENT_RENDER_ORDER.asteroid;
   group.position.set(
     neutral.position.x,
     neutral.position.y,
@@ -1845,9 +1870,10 @@ function createNeutralView(neutral: NeutralObject): THREE.Group {
     new THREE.MeshStandardMaterial({
       color: 0x3b4548,
       emissive: 0x020506,
-      emissiveIntensity: 0.12,
-      metalness: 0.48,
-      roughness: 0.82,
+      emissiveIntensity:
+        ENVIRONMENT_VISUAL_BASELINE.asteroid.bodyEmissiveIntensity,
+      metalness: ENVIRONMENT_VISUAL_BASELINE.asteroid.bodyMetalness,
+      roughness: ENVIRONMENT_VISUAL_BASELINE.asteroid.bodyRoughness,
       flatShading: true,
     }),
   );
@@ -1858,8 +1884,8 @@ function createNeutralView(neutral: NeutralObject): THREE.Group {
     new THREE.TetrahedronGeometry(0.85, 0),
     new THREE.MeshStandardMaterial({
       color: 0x20292b,
-      metalness: 0.58,
-      roughness: 0.76,
+      metalness: ENVIRONMENT_VISUAL_BASELINE.asteroid.facetMetalness,
+      roughness: ENVIRONMENT_VISUAL_BASELINE.asteroid.facetRoughness,
       flatShading: true,
     }),
   );
@@ -1897,6 +1923,9 @@ function formatSeedLabel(seed: number): string {
 }
 
 function createAttackEffect(attacker: Unit, target: Unit): void {
+  if (combatEffects.length >= getCombatEffectActiveBudget(effectsQuality)) {
+    return;
+  }
   const effect = acquireCombatEffect("line");
   if (effect) {
     const positions = effect.geometry.getAttribute("position") as THREE.BufferAttribute;
@@ -1916,7 +1945,9 @@ function createAttackEffect(attacker: Unit, target: Unit): void {
     effect.material.color.setHex(
       attacker.owner === "player" ? 0x8fcbd2 : 0xd7a188,
     );
-    effect.material.opacity = effectsQuality === "high" ? 0.86 : 0.62;
+    effect.material.opacity = effectsQuality === "high"
+      ? ENVIRONMENT_VISUAL_BASELINE.combatFeedback.highLineOpacity
+      : ENVIRONMENT_VISUAL_BASELINE.combatFeedback.lowLineOpacity;
     activateCombatEffect(effect, 0.16, 1);
   }
 
@@ -1926,6 +1957,9 @@ function createAttackEffect(attacker: Unit, target: Unit): void {
 }
 
 function createHitFlash(target: Unit, attackerOwner: Faction): void {
+  if (combatEffects.length >= getCombatEffectActiveBudget(effectsQuality)) {
+    return;
+  }
   const effect = acquireCombatEffect("burst");
   if (!effect) {
     return;
@@ -1943,6 +1977,9 @@ function createHitFlash(target: Unit, attackerOwner: Faction): void {
 }
 
 function createImpactEffect(unit: Unit): void {
+  if (combatEffects.length >= getCombatEffectActiveBudget(effectsQuality)) {
+    return;
+  }
   const effect = acquireCombatEffect("burst");
   if (!effect) {
     return;
@@ -1987,10 +2024,13 @@ function acquireCombatEffect(kind: CombatEffectKind): CombatEffect | null {
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
+    const object = new THREE.Line(geometry, material);
+    object.renderOrder = ENVIRONMENT_RENDER_ORDER.combatFeedback;
     return {
       kind,
-      object: new THREE.Line(geometry, material),
+      object,
       geometry,
       material,
       ttl: 0,
@@ -2007,9 +2047,11 @@ function acquireCombatEffect(kind: CombatEffectKind): CombatEffect | null {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
+  const object = new THREE.Mesh(geometry, material);
+  object.renderOrder = ENVIRONMENT_RENDER_ORDER.combatFeedback;
   return {
     kind,
-    object: new THREE.Mesh(geometry, material),
+    object,
     geometry,
     material,
     ttl: 0,
@@ -2046,8 +2088,9 @@ function createTargetMarker(): THREE.Group {
     new THREE.MeshBasicMaterial({
       color: 0xc99a69,
       transparent: true,
-      opacity: 0.68,
+      opacity: ENVIRONMENT_VISUAL_BASELINE.targetMarker.ringOpacity,
       blending: THREE.AdditiveBlending,
+      depthTest: false,
       depthWrite: false,
       side: THREE.DoubleSide,
     }),
@@ -2058,8 +2101,9 @@ function createTargetMarker(): THREE.Group {
   const bracketMaterial = new THREE.MeshBasicMaterial({
     color: 0xd9b48a,
     transparent: true,
-    opacity: 0.7,
+    opacity: ENVIRONMENT_VISUAL_BASELINE.targetMarker.bracketOpacity,
     blending: THREE.AdditiveBlending,
+    depthTest: false,
     depthWrite: false,
   });
   const horizontal = new THREE.Mesh(
@@ -2199,8 +2243,9 @@ function createStarfield(
     size: 1.45,
     sizeAttenuation: true,
     transparent: true,
-    opacity: 0.72,
+    opacity: ENVIRONMENT_VISUAL_BASELINE.background.starOpacity,
     blending: THREE.AdditiveBlending,
+    depthTest: false,
     depthWrite: false,
     vertexColors: true,
   });
@@ -2233,7 +2278,8 @@ function createSpaceDust(
     size: 46,
     map: createSoftParticleTexture(),
     transparent: true,
-    opacity: 0.075,
+    opacity: ENVIRONMENT_VISUAL_BASELINE.background.dustOpacity,
+    depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     vertexColors: true,
@@ -2282,9 +2328,10 @@ function createDistantPlanet(): THREE.Group {
     new THREE.MeshBasicMaterial({
       color: 0x35515f,
       transparent: true,
-      opacity: 0.09,
+      opacity: ENVIRONMENT_VISUAL_BASELINE.background.distantPlanetOpacity,
       blending: THREE.AdditiveBlending,
       side: THREE.BackSide,
+      depthTest: false,
       depthWrite: false,
     }),
   );
