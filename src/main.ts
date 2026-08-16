@@ -42,6 +42,9 @@ import {
   createAudioEventBus,
   createAudioUnitRef,
 } from "./audio/audio-events";
+import {
+  createWebAudioAdapter,
+} from "./audio/web-audio-adapter";
 import "./styles.css";
 
 const FIXED_STEP = 1 / 60;
@@ -117,6 +120,14 @@ const battleLogCount = getElement<HTMLElement>("#battle-log-count");
 const unitScaleSelect = getElement<HTMLSelectElement>("#unit-scale");
 const effectsQualityToggle = getElement<HTMLInputElement>("#effects-quality");
 const effectsQualityValue = getElement<HTMLElement>("#effects-quality-value");
+const audioStatus = getElement<HTMLElement>("#audio-status");
+const audioEnableButton = getElement<HTMLButtonElement>("#audio-enable");
+const audioMasterVolume = getElement<HTMLInputElement>("#audio-master-volume");
+const audioMasterVolumeValue = getElement<HTMLOutputElement>("#audio-master-volume-value");
+const audioEffectsVolume = getElement<HTMLInputElement>("#audio-effects-volume");
+const audioEffectsVolumeValue = getElement<HTMLOutputElement>("#audio-effects-volume-value");
+const audioMuted = getElement<HTMLInputElement>("#audio-muted");
+const audioReduced = getElement<HTMLInputElement>("#audio-reduced");
 const visibleUnitCount = getElement<HTMLElement>("#visible-unit-count");
 const frameCost = getElement<HTMLElement>("#frame-cost");
 const longFrameCountValue = getElement<HTMLElement>("#long-frame-count");
@@ -279,6 +290,8 @@ const audioEventBus = createAudioEventBus((event) => {
   );
   document.documentElement.dataset.audioLastCue = event.cue;
 });
+const audioAdapter = createWebAudioAdapter();
+audioEventBus.subscribe(audioAdapter.handleEvent);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -GROUND_Y);
@@ -315,6 +328,7 @@ const battleLogEntries: BattleLogEntry[] = [];
 
 runtimeStatus.textContent = "SYSTEM ONLINE";
 simulationStatus.textContent = "RUNNING";
+syncAudioControls();
 addBattleLog("system", "ENCOUNTER INITIALIZED · " + getEncounterSummary());
 emitAudioEvent({
   type: "alert",
@@ -337,6 +351,11 @@ restartEncounterButton.addEventListener("click", resetEncounter);
 newEncounterButton.addEventListener("click", startNewEncounter);
 unitScaleSelect.addEventListener("change", handleUnitScaleChange);
 effectsQualityToggle.addEventListener("change", handleEffectsQualityChange);
+audioEnableButton.addEventListener("click", handleAudioEnable);
+audioMasterVolume.addEventListener("input", handleAudioSettingsChange);
+audioEffectsVolume.addEventListener("input", handleAudioSettingsChange);
+audioMuted.addEventListener("change", handleAudioSettingsChange);
+audioReduced.addEventListener("change", handleAudioSettingsChange);
 minimapCanvas.addEventListener("pointerdown", handleMinimapPointerDown);
 minimapCanvas.addEventListener("keydown", handleMinimapKeyDown);
 quickStartClose.addEventListener("click", hideQuickStart);
@@ -1931,6 +1950,47 @@ function handleEffectsQualityChange(): void {
   updateEffectsQualityLabel();
   emitUiAudio("ui-toggle-effects", "low", { quality: effectsQuality });
   addBattleLog("system", "VISUAL EFFECTS · " + effectsQuality.toUpperCase());
+}
+
+async function handleAudioEnable(): Promise<void> {
+  const ready = await audioAdapter.unlock();
+  syncAudioControls();
+  if (ready) {
+    emitUiAudio("ui-audio-enabled", "normal");
+    seedActionStatus.textContent = "AUDIO READY · SETTINGS SAVED";
+  } else {
+    seedActionStatus.textContent = "AUDIO UNAVAILABLE · GAME CONTINUES SILENT";
+    seedActionStatus.classList.add("seed-action-status--error");
+  }
+}
+
+function handleAudioSettingsChange(): void {
+  audioAdapter.setSettings({
+    masterVolume: Number(audioMasterVolume.value) / 100,
+    effectsVolume: Number(audioEffectsVolume.value) / 100,
+    muted: audioMuted.checked,
+    reducedAudio: audioReduced.checked,
+  });
+  syncAudioControls();
+  emitUiAudio("ui-audio-setting", "low");
+}
+
+function syncAudioControls(): void {
+  const settings = audioAdapter.getSettings();
+  const masterPercent = Math.round(settings.masterVolume * 100);
+  const effectsPercent = Math.round(settings.effectsVolume * 100);
+  audioMasterVolume.value = String(masterPercent);
+  audioMasterVolumeValue.value = masterPercent + "%";
+  audioEffectsVolume.value = String(effectsPercent);
+  audioEffectsVolumeValue.value = effectsPercent + "%";
+  audioMuted.checked = settings.muted;
+  audioReduced.checked = settings.reducedAudio;
+  const state = audioAdapter.getState();
+  audioStatus.textContent = state === "ready"
+    ? settings.muted ? "MUTED" : "AUDIO READY"
+    : state === "unavailable" ? "UNAVAILABLE" : "AUDIO LOCKED";
+  audioEnableButton.textContent = state === "ready" ? "AUDIO READY" : "ENABLE AUDIO";
+  document.documentElement.setAttribute("data-audio-adapter-state", state);
 }
 
 function updateEffectsQualityLabel(): void {

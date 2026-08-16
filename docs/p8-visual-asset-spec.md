@@ -141,3 +141,13 @@ Carrier 复用 scout/striker 已签核的加载、manifest、回退和 QA 契约
 | `ui` | `ui-select`、`ui-target-lock`、`ui-move-order`、`ui-attack-order`、`ui-stop-order`、`ui-pause`、`ui-resume`、`ui-toggle-effects`、`ui-error` | 选取、锁定、指令、暂停和错误反馈 | ui / low–high |
 
 适配器必须遵守：combat 最多 8 复音、warning 最多 2 复音、ui 最多 4 复音；单帧最多接收 8 个事件，QA 历史最多保留 96 个事件；超出预算时按 priority 丢弃低优先级事件，不阻塞 simulation。缺失 cue 必须保留事件并交给适配器的 fallback，静音或浏览器不支持空间音频时不得改变游戏状态。
+
+## 13. P8 WebAudio 与可访问性适配
+
+`src/audio/web-audio-adapter.ts` 在事件契约之上提供可替换的 WebAudio 适配器。当前 cue 使用短时程序化振荡器作为开发/候选版素材层，后续可将 `playCue` 替换为真实采样或音频 sprite，而不改变事件名和主循环。
+
+- 用户必须主动点击 `ENABLE AUDIO` 才创建/恢复 `AudioContext`，避免违反浏览器 autoplay policy；上下文创建失败时状态显示 `UNAVAILABLE`，游戏继续静默运行。
+- 混音链为 `oscillator → effectsGain → masterGain → destination`；主音量和音效音量分别可调，设置保存到 `rts-audio-settings`。
+- `MUTE` 将 master gain 置零但不丢弃事件；`REDUCE STIMULI` 保留高优先级警报、摧毁和关键 UI，跳过普通攻击/命中与低优先级提示。
+- 事件位置按 `x / 220` 映射到 `StereoPannerNode` 的 -1…1；不支持空间声像时直接连接 effects bus，不能阻塞或改变 simulation。
+- 音量滑块、静音和减少刺激均使用原生可访问控件，并在移动端保持无横向溢出；无障碍选项只影响音频输出，不隐藏战斗反馈或 HUD。

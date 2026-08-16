@@ -92,6 +92,27 @@
             <strong id="effects-quality-value">HIGH</strong>
           </label>
         </div>
+        <div class="audio-control" aria-label="Audio accessibility settings">
+          <div class="audio-control__header">
+            <span>SOUND</span>
+            <strong id="audio-status" role="status">AUDIO LOCKED</strong>
+          </div>
+          <button id="audio-enable" class="audio-enable" type="button">ENABLE AUDIO</button>
+          <label class="audio-range" for="audio-master-volume">
+            <span>MASTER</span>
+            <input id="audio-master-volume" type="range" min="0" max="100" step="1" value="72" />
+            <output id="audio-master-volume-value" for="audio-master-volume">72%</output>
+          </label>
+          <label class="audio-range" for="audio-effects-volume">
+            <span>EFFECTS</span>
+            <input id="audio-effects-volume" type="range" min="0" max="100" step="1" value="82" />
+            <output id="audio-effects-volume-value" for="audio-effects-volume">82%</output>
+          </label>
+          <div class="audio-options">
+            <label><input id="audio-muted" type="checkbox" /> MUTE</label>
+            <label><input id="audio-reduced" type="checkbox" /> REDUCE STIMULI</label>
+          </div>
+        </div>
         <p id="seed-action-status" class="seed-action-status" aria-live="polite">LINK READY</p>
         <dl class="encounter-metrics">
           <div>
