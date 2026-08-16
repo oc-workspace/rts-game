@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "source": "Deterministic WebAudio candidate cue render",
+  "rights": "Project-generated candidate assets; replace with final licensed recordings before release.",
+  "sampleRate": 44100,
+  "channels": 1,
+  "assets": {
+    "encounter-start": {
+      "url": "/assets/audio/v1/encounter-start.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.45,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "incoming-fire": {
+      "url": "/assets/audio/v1/incoming-fire.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.3,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "victory": {
+      "url": "/assets/audio/v1/victory.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.56,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "defeat": {
+      "url": "/assets/audio/v1/defeat.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.66,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "weapon-fire": {
+      "url": "/assets/audio/v1/weapon-fire.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.18,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "weapon-hit": {
+      "url": "/assets/audio/v1/weapon-hit.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.07,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "unit-destroyed": {
+      "url": "/assets/audio/v1/unit-destroyed.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.46,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-select": {
+      "url": "/assets/audio/v1/ui-select.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.06,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-target-lock": {
+      "url": "/assets/audio/v1/ui-target-lock.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.16,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-move-order": {
+      "url": "/assets/audio/v1/ui-move-order.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.14,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-queue-move": {
+      "url": "/assets/audio/v1/ui-queue-move.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.14,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-attack-order": {
+      "url": "/assets/audio/v1/ui-attack-order.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.18,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-queue-attack": {
+      "url": "/assets/audio/v1/ui-queue-attack.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.18,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-stop-order": {
+      "url": "/assets/audio/v1/ui-stop-order.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.08,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-pause": {
+      "url": "/assets/audio/v1/ui-pause.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.26,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-resume": {
+      "url": "/assets/audio/v1/ui-resume.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.22,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-toggle-effects": {
+      "url": "/assets/audio/v1/ui-toggle-effects.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.06,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-audio-enabled": {
+      "url": "/assets/audio/v1/ui-audio-enabled.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.2,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-audio-setting": {
+      "url": "/assets/audio/v1/ui-audio-setting.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.04,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    },
+    "ui-error": {
+      "url": "/assets/audio/v1/ui-error.wav",
+      "format": "wav",
+      "channels": 1,
+      "sampleRate": 44100,
+      "duration": 0.12,
+      "source": "project-generated candidate",
+      "fallback": "procedural-cue"
+    }
+  }
+}

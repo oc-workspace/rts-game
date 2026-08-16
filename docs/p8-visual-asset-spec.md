@@ -151,3 +151,5 @@ Carrier 复用 scout/striker 已签核的加载、manifest、回退和 QA 契约
 - `MUTE` 将 master gain 置零但不丢弃事件；`REDUCE STIMULI` 保留高优先级警报、摧毁和关键 UI，跳过普通攻击/命中与低优先级提示。
 - 事件位置按 `x / 220` 映射到 `StereoPannerNode` 的 -1…1；不支持空间声像时直接连接 effects bus，不能阻塞或改变 simulation。
 - 音量滑块、静音和减少刺激均使用原生可访问控件，并在移动端保持无横向溢出；无障碍选项只影响音频输出，不隐藏战斗反馈或 HUD。
+- 候选采样由 `scripts/build-audio-assets.mjs` 和 `npm run assets:audio` 可重复生成，20 个 cue 统一写入 `public/assets/audio/v1/asset-manifest.json`；发布前应将 manifest 中的 `project-generated candidate` 替换为已授权的最终录音，并保留同名 cue 和 fallback 字段。
+- 采样加载是异步且逐 cue 原子完成：manifest、单个 WAV 或 `decodeAudioData` 失败只影响对应 cue，其他 cue 和程序化 fallback 继续可用；200 单位场景不在未解锁时加载 AudioContext，不增加启动阻塞。

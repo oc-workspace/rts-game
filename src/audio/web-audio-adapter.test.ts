@@ -20,6 +20,14 @@ function createFakeContext(): { context: AudioContext; started: number } {
     currentTime: 0,
     destination: {},
     createGain: gain,
+    createDynamicsCompressor: () => ({
+      threshold: { value: 0 },
+      knee: { value: 0 },
+      ratio: { value: 0 },
+      attack: { value: 0 },
+      release: { value: 0 },
+      connect() {},
+    }),
     createStereoPanner: () => ({ pan: { value: 0 }, connect() {} }),
     createOscillator: () => ({
       type: "sine" as OscillatorType,
@@ -93,6 +101,7 @@ describe("P8 WebAudio adapter settings", () => {
     const adapter = createWebAudioAdapter({
       storage: createMemoryStorage(),
       contextFactory: () => fake.context,
+      loadSamples: false,
     });
     const event = {
       schemaVersion: 1 as const,

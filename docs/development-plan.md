@@ -280,7 +280,7 @@ P0 至 P7 已交付第一版随机遭遇 vertical slice 候选版，但不等于
 
 目标：把当前程序化原型视觉升级为具有统一美术规范、可替换资产管线和明确层级的舰队视觉，而不是只增加装饰数量。
 
-当前进度：三舰种第一轮轮廓、第二轮程序化材质/贴花/分阶段损伤、第三轮 scout/striker/carrier glTF 2.0/PBR 正式资产试点、第四轮环境视觉基线、声音设计事件接口，以及 WebAudio/混音/可访问性适配均已完成固定 seed 的桌面/移动回归。三舰种均具备资产清单、异步原子替换、显式程序化回退、网格/性能预算和 200 单位远景隔离验证；环境层级、材质、目标标记、战斗反馈和后处理预算已由 `src/render/environment-visuals.ts` 固化，声音事件由 `src/audio/audio-events.ts` 固化，WebAudio 适配由 `src/audio/web-audio-adapter.ts` 固化，selection、combat、LOD、实例化和高低特效路径保持稳定。P8 仅剩将程序化 cue 替换为最终采样素材的制作工作。
+当前进度：三舰种第一轮轮廓、第二轮程序化材质/贴花/分阶段损伤、第三轮 scout/striker/carrier glTF 2.0/PBR 正式资产试点、第四轮环境视觉基线、声音设计事件接口，以及 WebAudio/混音/可访问性适配均已完成固定 seed 的桌面/移动回归。20 个可重复生成的 WAV 候选 cue 和 manifest 已接入采样优先、逐 cue fallback 的加载路径。三舰种均具备资产清单、异步原子替换、显式程序化回退、网格/性能预算和 200 单位远景隔离验证；环境层级、材质、目标标记、战斗反馈和后处理预算已由 `src/render/environment-visuals.ts` 固化，声音事件由 `src/audio/audio-events.ts` 固化，WebAudio 适配由 `src/audio/web-audio-adapter.ts` 固化，selection、combat、LOD、实例化和高低特效路径保持稳定。P8 仅剩将候选 cue 替换为最终授权采样并完成听感评审。
 
 主要任务：
 

@@ -1,4 +1,4 @@
-import type { AudioEvent, AudioPriority } from "./audio-events";
+import type { AudioEvent } from "./audio-events";
 
 export const AUDIO_SETTINGS_STORAGE_KEY = "rts-audio-settings";
 
@@ -29,12 +29,31 @@ export interface WebAudioAdapter {
   setSettings(patch: Partial<AudioSettings>): AudioSettings;
   unlock(): Promise<boolean>;
   handleEvent(event: AudioEvent): void;
+  getLoadedSampleCount(): number;
   dispose(): void;
 }
 
 export interface WebAudioAdapterOptions {
   storage?: AudioSettingsStorage | null;
   contextFactory?: () => AudioContext;
+  fetchFn?: typeof fetch;
+  manifestUrl?: string;
+  loadSamples?: boolean;
+}
+
+export interface AudioAssetManifest {
+  schemaVersion: number;
+  sampleRate: number;
+  channels: number;
+  assets: Record<string, {
+    url: string;
+    format: string;
+    channels: number;
+    sampleRate: number;
+    duration: number;
+    source: string;
+    fallback: string;
+  }>;
 }
 
 interface CueProfile {
@@ -121,18 +140,27 @@ export function createWebAudioAdapter(
   const storage = options.storage === undefined
     ? getBrowserStorage()
     : options.storage;
+  const fetchFn = options.fetchFn ?? globalThis.fetch?.bind(globalThis);
+  const manifestUrl = options.manifestUrl ?? "/assets/audio/v1/asset-manifest.json";
+  const loadSamples = options.loadSamples ?? true;
   let settings = loadAudioSettings(storage);
   let state: WebAudioState = "locked";
   let context: AudioContext | null = null;
   let masterGain: GainNode | null = null;
-  let effectsGain: GainNode | null = null;
+  let compressor: DynamicsCompressorNode | null = null;
+  const buses: Partial<Record<AudioEvent["channel"], GainNode>> = {};
+  const buffers = new Map<string, AudioBuffer>();
+  let loadingSamples = false;
 
   const syncGain = (): void => {
     if (masterGain) {
       masterGain.gain.value = settings.muted ? 0 : settings.masterVolume;
     }
-    if (effectsGain) {
-      effectsGain.gain.value = settings.effectsVolume;
+    for (const [channel, gain] of Object.entries(buses)) {
+      if (!gain) continue;
+      gain.gain.value = channel === "warning"
+        ? Math.min(1, settings.effectsVolume * 1.08)
+        : settings.effectsVolume;
     }
   };
 
@@ -143,15 +171,34 @@ export function createWebAudioAdapter(
       if (!context) {
         context = getContextFactory();
         masterGain = context.createGain();
-        effectsGain = context.createGain();
-        effectsGain.connect(masterGain);
-        masterGain.connect(context.destination);
+        compressor = typeof context.createDynamicsCompressor === "function"
+          ? context.createDynamicsCompressor()
+          : null;
+        if (compressor) {
+          compressor.threshold.value = -18;
+          compressor.knee.value = 12;
+          compressor.ratio.value = 4;
+          compressor.attack.value = 0.003;
+          compressor.release.value = 0.18;
+        }
+        for (const channel of ["combat", "warning", "ui"] as const) {
+          buses[channel] = context.createGain();
+          buses[channel]?.connect(masterGain);
+        }
+        masterGain.connect(compressor ?? context.destination);
+        compressor?.connect(context.destination);
         syncGain();
       }
       if (context.state === "suspended") {
         await context.resume();
       }
       state = "ready";
+      if (loadSamples && !loadingSamples) {
+        loadingSamples = true;
+        void loadAudioSamples(context, fetchFn, manifestUrl, buffers).finally(() => {
+          loadingSamples = false;
+        });
+      }
       return true;
     } catch {
       state = "unavailable";
@@ -167,13 +214,20 @@ export function createWebAudioAdapter(
   };
 
   const handleEvent = (event: AudioEvent): void => {
-    if (state !== "ready" || settings.muted || !context || !effectsGain) {
+    if (state !== "ready" || settings.muted || !context) {
       return;
     }
     if (settings.reducedAudio && shouldReduceEvent(event)) {
       return;
     }
-    playCue(context, effectsGain, event);
+    const destination = buses[event.channel] ?? buses.ui;
+    if (!destination) return;
+    const buffer = buffers.get(event.cue);
+    if (buffer) {
+      playSample(context, destination, buffer, event);
+    } else {
+      playCue(context, destination, event);
+    }
   };
 
   const dispose = (): void => {
@@ -182,7 +236,11 @@ export function createWebAudioAdapter(
     }
     context = null;
     masterGain = null;
-    effectsGain = null;
+    compressor = null;
+    for (const channel of Object.keys(buses)) {
+      delete buses[channel as AudioEvent["channel"]];
+    }
+    buffers.clear();
     state = "locked";
   };
 
@@ -192,8 +250,62 @@ export function createWebAudioAdapter(
     setSettings,
     unlock,
     handleEvent,
+    getLoadedSampleCount: () => buffers.size,
     dispose,
   };
+}
+
+async function loadAudioSamples(
+  context: AudioContext,
+  fetchFn: typeof fetch | undefined,
+  manifestUrl: string,
+  buffers: Map<string, AudioBuffer>,
+): Promise<void> {
+  if (!fetchFn) return;
+  try {
+    const manifestResponse = await fetchFn(manifestUrl);
+    if (!manifestResponse.ok) return;
+    const manifest = await manifestResponse.json() as AudioAssetManifest;
+    await Promise.all(Object.entries(manifest.assets).map(async ([cue, asset]) => {
+      try {
+        const response = await fetchFn(asset.url);
+        if (!response.ok) return;
+        const data = await response.arrayBuffer();
+        const buffer = await context.decodeAudioData(data.slice(0));
+        buffers.set(cue, buffer);
+      } catch {
+        // Keep this cue on the deterministic procedural fallback.
+      }
+    }));
+  } catch {
+    // An unavailable manifest must never block the game or AudioContext unlock.
+  }
+}
+
+function playSample(
+  context: AudioContext,
+  destination: GainNode,
+  buffer: AudioBuffer,
+  event: AudioEvent,
+): void {
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  const envelope = context.createGain();
+  envelope.gain.value = event.intensity;
+  const panner = typeof context.createStereoPanner === "function"
+    ? context.createStereoPanner()
+    : null;
+  if (panner) {
+    panner.pan.value = event.position
+      ? Math.max(-1, Math.min(1, event.position.x / 220))
+      : 0;
+    panner.connect(destination);
+    envelope.connect(panner);
+  } else {
+    envelope.connect(destination);
+  }
+  source.connect(envelope);
+  source.start();
 }
 
 function playCue(
