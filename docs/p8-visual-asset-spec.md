@@ -125,3 +125,19 @@ Carrier 复用 scout/striker 已签核的加载、manifest、回退和 QA 契约
 - 战斗反馈沿用线路/爆发对象池，总池上限 256；高特效最多 96 个活动对象，低特效最多 48 个活动对象。线路、爆发统一 `renderOrder=40`，不写入深度；低特效仍保留武器轨迹，命中闪光只在高特效启用。
 - 后处理预算为 0 个额外 pass，沿用 ACESFilmicToneMapping 与 exposure 1.08；全场加法叠加层不超过 3 类（星场、空间尘埃、标记/反馈复用现有层级）。
 - 固定 seed `20260810` 的桌面、390×844 移动端、高/低特效及 200 单位压力场景必须保留无控制台错误；200 单位仍要求 `DETAIL=0`，不加载环境之外的近景 glTF。
+
+## 12. P8 声音设计接口
+
+声音接口只描述“发生了什么”，不把音频文件、WebAudio 节点或混音实现写进战斗逻辑。契约实现位于 `src/audio/audio-events.ts`，主循环通过 `window` 的 `rts-audio-event` 自定义事件桥接；当前默认没有声音播放，后续适配器可独立订阅并替换。
+
+事件统一包含：`schemaVersion`、单调递增 `eventId`、`type`、`cue`、simulation `time`、`channel`、`priority`、0–1 `intensity`，以及可选的 source/target 单位引用、空间位置和 metadata。单位引用只保留 `id/owner/classId`，不暴露可变的 `Unit` 对象。
+
+| 事件类型 | 主要 cue | 触发入口 | 声道/优先级 |
+| --- | --- | --- | --- |
+| `alert` | `encounter-start`、`incoming-fire`、`victory`、`defeat` | 遭遇载入、选中单位遭受敌火、胜负结算 | warning / normal–critical |
+| `attack` | `weapon-fire` | `performAttack` 扣血前 | combat / normal |
+| `hit` | `weapon-hit` | `performAttack` 扣血后 | combat / normal–high |
+| `destroyed` | `unit-destroyed` | `destroyUnit` | combat / high |
+| `ui` | `ui-select`、`ui-target-lock`、`ui-move-order`、`ui-attack-order`、`ui-stop-order`、`ui-pause`、`ui-resume`、`ui-toggle-effects`、`ui-error` | 选取、锁定、指令、暂停和错误反馈 | ui / low–high |
+
+适配器必须遵守：combat 最多 8 复音、warning 最多 2 复音、ui 最多 4 复音；单帧最多接收 8 个事件，QA 历史最多保留 96 个事件；超出预算时按 priority 丢弃低优先级事件，不阻塞 simulation。缺失 cue 必须保留事件并交给适配器的 fallback，静音或浏览器不支持空间音频时不得改变游戏状态。

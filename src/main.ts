@@ -38,6 +38,10 @@ import {
   ENVIRONMENT_VISUAL_BASELINE,
   getCombatEffectActiveBudget,
 } from "./render/environment-visuals";
+import {
+  createAudioEventBus,
+  createAudioUnitRef,
+} from "./audio/audio-events";
 import "./styles.css";
 
 const FIXED_STEP = 1 / 60;
@@ -268,6 +272,13 @@ const combatEffectPool: Record<CombatEffectKind, CombatEffect[]> = {
   burst: [],
 };
 let combatEffectObjectCount = 0;
+const audioEventBus = createAudioEventBus((event) => {
+  window.dispatchEvent(new CustomEvent("rts-audio-event", { detail: event }));
+  document.documentElement.dataset.audioEventCount = String(
+    audioEventBus.history().length,
+  );
+  document.documentElement.dataset.audioLastCue = event.cue;
+});
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -GROUND_Y);
@@ -305,6 +316,15 @@ const battleLogEntries: BattleLogEntry[] = [];
 runtimeStatus.textContent = "SYSTEM ONLINE";
 simulationStatus.textContent = "RUNNING";
 addBattleLog("system", "ENCOUNTER INITIALIZED · " + getEncounterSummary());
+emitAudioEvent({
+  type: "alert",
+  cue: "encounter-start",
+  time: simulationTime,
+  channel: "warning",
+  priority: "normal",
+  position: cameraFocus,
+  metadata: { seed: SCENE_SEED },
+});
 applyInspectionPresetFromUrl();
 updateTelemetry(previousTime);
 updateUnitCard();
@@ -508,7 +528,31 @@ function performAttack(state: WorldState, attacker: Unit, target: Unit): void {
   const attackerClass = getShipClass(attacker);
   attacker.cooldownRemaining = attackerClass.cooldown;
   target.health = Math.max(0, target.health - attackerClass.damage);
+  emitAudioEvent({
+    type: "attack",
+    cue: "weapon-fire",
+    time: simulationTime,
+    channel: "combat",
+    priority: "normal",
+    intensity: 0.55 + attackerClass.damage / 220,
+    source: getAudioUnitRef(attacker),
+    target: getAudioUnitRef(target),
+    position: attacker.position,
+    metadata: { damage: attackerClass.damage },
+  });
   createAttackEffect(attacker, target);
+  emitAudioEvent({
+    type: "hit",
+    cue: "weapon-hit",
+    time: simulationTime,
+    channel: "combat",
+    priority: target.health <= 0 ? "high" : "normal",
+    intensity: target.health <= 0 ? 1 : 0.72,
+    source: getAudioUnitRef(attacker),
+    target: getAudioUnitRef(target),
+    position: target.position,
+    metadata: { remainingHealth: target.health },
+  });
   addBattleLog(
     attacker.owner === "player" ? "friendly" : "hostile",
     attacker.id.toUpperCase() + " HIT " + target.id.toUpperCase() +
@@ -521,6 +565,17 @@ function performAttack(state: WorldState, attacker: Unit, target: Unit): void {
   } else if (target.selected) {
     state.statusMessage =
       "INCOMING FIRE · " + attacker.id.toUpperCase();
+    emitAudioEvent({
+      type: "alert",
+      cue: "incoming-fire",
+      time: simulationTime,
+      channel: "warning",
+      priority: "high",
+      intensity: 0.9,
+      source: getAudioUnitRef(attacker),
+      target: getAudioUnitRef(target),
+      position: target.position,
+    });
   }
 
   if (target.health <= 0) {
@@ -545,6 +600,17 @@ function destroyUnit(state: WorldState, unit: Unit, attacker: Unit): void {
     view.group.visible = false;
   }
   createImpactEffect(unit);
+  emitAudioEvent({
+    type: "destroyed",
+    cue: "unit-destroyed",
+    time: simulationTime,
+    channel: "combat",
+    priority: "high",
+    intensity: 1,
+    source: getAudioUnitRef(attacker),
+    target: getAudioUnitRef(unit),
+    position: unit.position,
+  });
   state.statusMessage =
     unit.id.toUpperCase() + " DESTROYED BY " + attacker.id.toUpperCase();
   addBattleLog("result", state.statusMessage);
@@ -567,11 +633,29 @@ function checkBattleOutcome(state: WorldState): void {
     state.winner = "player";
     state.statusMessage = "VICTORY · ENEMY FLEET DESTROYED";
     paused = true;
+    emitAudioEvent({
+      type: "alert",
+      cue: "victory",
+      time: simulationTime,
+      channel: "warning",
+      priority: "critical",
+      intensity: 1,
+      position: cameraFocus,
+    });
     addBattleLog("result", state.statusMessage);
   } else if (!playerAlive && enemyAlive) {
     state.winner = "enemy";
     state.statusMessage = "DEFEAT · SCOUT DESTROYED";
     paused = true;
+    emitAudioEvent({
+      type: "alert",
+      cue: "defeat",
+      time: simulationTime,
+      channel: "warning",
+      priority: "critical",
+      intensity: 1,
+      position: cameraFocus,
+    });
     addBattleLog("result", state.statusMessage);
   }
 }
@@ -1086,6 +1170,7 @@ function handleKeyDown(event: KeyboardEvent): void {
     paused = !paused;
     simulationStatus.textContent = paused ? "PAUSED" : "RUNNING";
     addBattleLog("system", paused ? "SIMULATION PAUSED" : "SIMULATION RESUMED");
+    emitUiAudio(paused ? "ui-pause" : "ui-resume", "normal");
   }
 
   if (key === "n") {
@@ -1142,6 +1227,7 @@ function handlePointerDown(event: PointerEvent): void {
       world.aimedTargetId = hit.id;
       world.statusMessage =
         "TARGET LOCK · " + hit.id.toUpperCase() + " · RIGHT CLICK TO ATTACK";
+      emitUiAudio("ui-target-lock", "normal", { targetId: hit.id });
       updateUnitCard();
     } else {
       if (!event.shiftKey) {
@@ -1320,6 +1406,7 @@ function setSelection(unitId: string | null, additive = false): void {
   }
 
   world.statusMessage = formatSelectionStatus();
+  emitUiAudio("ui-select", "normal", { count: world.selectedUnitIds.size });
   updateUnitCard();
 }
 
@@ -1362,6 +1449,7 @@ function selectUnitsInBox(additive: boolean): void {
   world.selectedUnitIds = selectedIds;
   world.aimedTargetId = null;
   world.statusMessage = formatSelectionStatus();
+  emitUiAudio("ui-select", "normal", { count: world.selectedUnitIds.size });
   updateUnitCard();
 }
 
@@ -1436,6 +1524,9 @@ function issueMoveOrder(target: Vec3, queue = false): void {
   };
   world.lastOrder = order;
   world.statusMessage = (queue ? "QUEUED MOVE · " : "MOVE ORDER · ") + formatPosition(target);
+  emitUiAudio(queue ? "ui-queue-move" : "ui-move-order", "normal", {
+    count: selectedIds.length,
+  });
   addBattleLog("friendly", world.statusMessage + " · " + selectedIds.length + " UNITS");
 
   selectedIds.forEach((unitId, index) => {
@@ -1456,6 +1547,7 @@ function issueAttackOrder(targetId: string, queue = false): void {
   const selectedIds = [...world.selectedUnitIds];
   if (!target || target.destroyed || selectedIds.length === 0) {
     world.statusMessage = "SELECT A PLAYER UNIT FIRST";
+    emitUiAudio("ui-error", "high", { reason: "attack-without-selection" });
     updateUnitCard();
     return;
   }
@@ -1471,6 +1563,10 @@ function issueAttackOrder(targetId: string, queue = false): void {
   world.playerHasEngaged = true;
   world.statusMessage =
     (queue ? "QUEUED ATTACK · " : "ATTACK ORDER · ") + targetId.toUpperCase();
+  emitUiAudio(queue ? "ui-queue-attack" : "ui-attack-order", "normal", {
+    count: selectedIds.length,
+    targetId,
+  });
   addBattleLog("friendly", world.statusMessage + " · " + selectedIds.length + " UNITS");
 
   for (const unitId of selectedIds) {
@@ -1495,6 +1591,7 @@ function stopSelectedUnits(): void {
   }
   world.lastOrder = null;
   world.statusMessage = "STOPPED";
+  emitUiAudio("ui-stop-order", "normal", { count: world.selectedUnitIds.size });
   addBattleLog("system", "STOP ORDER · " + world.selectedUnitIds.size + " UNITS");
   updateUnitCard();
 }
@@ -1750,6 +1847,15 @@ function loadEncounter(seed: number, statusMessage: string): void {
   renderedFleetSignature = "";
   resetPerformanceMetrics();
   addBattleLog("system", statusMessage + " · " + getEncounterSummary());
+  emitAudioEvent({
+    type: "alert",
+    cue: "encounter-start",
+    time: simulationTime,
+    channel: "warning",
+    priority: "normal",
+    position: cameraFocus,
+    metadata: { seed: world.seed },
+  });
   seedActionStatus.textContent = statusMessage;
   seedActionStatus.classList.remove("seed-action-status--error");
   updateUnitCard();
@@ -1823,6 +1929,7 @@ function handleEffectsQualityChange(): void {
   effectsQuality = effectsQualityToggle.checked ? "high" : "low";
   window.localStorage.setItem("rts-effects-quality", effectsQuality);
   updateEffectsQualityLabel();
+  emitUiAudio("ui-toggle-effects", "low", { quality: effectsQuality });
   addBattleLog("system", "VISUAL EFFECTS · " + effectsQuality.toUpperCase());
 }
 
@@ -1920,6 +2027,33 @@ function parseStressUnitCount(value: string): StressUnitCount | null {
 
 function formatSeedLabel(seed: number): string {
   return "RTS-P6-" + String(seed >>> 0).slice(-6).padStart(6, "0");
+}
+
+function emitAudioEvent(input: Parameters<typeof audioEventBus.emit>[0]): void {
+  audioEventBus.emit(input);
+}
+
+function emitUiAudio(
+  cue: string,
+  priority: "high" | "normal" | "low" = "normal",
+  metadata?: Readonly<Record<string, string | number | boolean>>,
+): void {
+  emitAudioEvent({
+    type: "ui",
+    cue,
+    time: simulationTime,
+    channel: "ui",
+    priority,
+    metadata,
+  });
+}
+
+function getAudioUnitRef(unit: Unit) {
+  return createAudioUnitRef({
+    id: unit.id,
+    owner: unit.owner,
+    classId: unit.classId,
+  });
 }
 
 function createAttackEffect(attacker: Unit, target: Unit): void {
