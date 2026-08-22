@@ -424,6 +424,73 @@ h1 {
   outline: none;
 }
 
+.anniversary-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.55rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid rgba(214, 171, 93, 0.2);
+  color: #b7955f;
+  font: 700 0.43rem/1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.12em;
+}
+
+.anniversary-button {
+  min-height: 1.65rem;
+  border: 1px solid rgba(230, 181, 95, 0.48);
+  border-radius: 2px;
+  color: #ffe3a4;
+  background:
+    linear-gradient(110deg, rgba(107, 55, 70, 0.72), rgba(55, 72, 96, 0.78)),
+    #172129;
+  box-shadow: inset 0 0 0.8rem rgba(255, 203, 109, 0.05);
+  font: 700 0.44rem/1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.anniversary-button span {
+  display: inline-block;
+  margin-right: 0.22rem;
+  color: #ffcf70;
+}
+
+.anniversary-button:hover,
+.anniversary-button:focus-visible {
+  border-color: rgba(255, 214, 132, 0.9);
+  color: #fff2ce;
+  outline: 1px solid rgba(255, 205, 114, 0.28);
+  outline-offset: 2px;
+  box-shadow: 0 0 1rem rgba(255, 167, 92, 0.17);
+}
+
+.anniversary-button--launched span {
+  animation: anniversary-spark 650ms ease-out;
+}
+
+@keyframes anniversary-spark {
+  0% {
+    transform: scale(0.7) rotate(0);
+  }
+
+  45% {
+    filter: drop-shadow(0 0 0.4rem #ffd986);
+    transform: scale(1.65) rotate(110deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(180deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anniversary-button--launched span {
+    animation: none;
+  }
+}
+
 .seed-action-status {
   min-height: 0.65rem;
   margin-top: 0.45rem;

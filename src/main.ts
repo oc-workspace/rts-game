@@ -33,6 +33,7 @@ import {
   updateShipVisual,
 } from "./render/ship-visuals";
 import type { EffectsQuality, ShipView } from "./render/ship-visuals";
+import { AnniversaryFireworks } from "./render/anniversary-fireworks";
 import {
   ENVIRONMENT_RENDER_ORDER,
   ENVIRONMENT_VISUAL_BASELINE,
@@ -137,10 +138,14 @@ const selectionBox = getElement<HTMLDivElement>("#selection-box");
 const quickStartPanel = getElement<HTMLElement>("#quick-start-panel");
 const quickStartClose = getElement<HTMLButtonElement>("#quick-start-close");
 const helpToggle = getElement<HTMLButtonElement>("#help-toggle");
+const anniversaryFireworksButton = getElement<HTMLButtonElement>(
+  "#anniversary-fireworks",
+);
 const minimapContext = minimapCanvas.getContext("2d");
 
 const random = createSeededRandom(SCENE_SEED);
 const scene = new THREE.Scene();
+const anniversaryFireworks = new AnniversaryFireworks(scene);
 scene.background = new THREE.Color(ENVIRONMENT_VISUAL_BASELINE.background.clearColor);
 scene.fog = new THREE.FogExp2(
   ENVIRONMENT_VISUAL_BASELINE.background.fogColor,
@@ -360,6 +365,7 @@ minimapCanvas.addEventListener("pointerdown", handleMinimapPointerDown);
 minimapCanvas.addEventListener("keydown", handleMinimapKeyDown);
 quickStartClose.addEventListener("click", hideQuickStart);
 helpToggle.addEventListener("click", showQuickStart);
+anniversaryFireworksButton.addEventListener("click", launchAnniversaryFireworks);
 renderer.domElement.addEventListener("pointerdown", handlePointerDown);
 renderer.domElement.addEventListener("pointermove", handlePointerMove);
 renderer.domElement.addEventListener("pointerup", handlePointerUp);
@@ -389,6 +395,7 @@ function render(now: number): void {
   simulationWindowMs += performance.now() - simulationStart;
 
   const renderStart = performance.now();
+  anniversaryFireworks.update(frameDelta);
   renderPresentation();
   renderer.render(scene, camera);
   captureRenderedFrame(now);
@@ -1226,6 +1233,24 @@ function hideQuickStart(): void {
 function showQuickStart(): void {
   quickStartPanel.hidden = false;
   helpToggle.hidden = true;
+}
+
+function launchAnniversaryFireworks(): void {
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  anniversaryFireworks.launch({
+    highQuality: effectsQualityToggle.checked,
+    reducedMotion: audioReduced.checked || prefersReducedMotion,
+  });
+  anniversaryFireworksButton.classList.remove("anniversary-button--launched");
+  void anniversaryFireworksButton.offsetWidth;
+  anniversaryFireworksButton.classList.add("anniversary-button--launched");
+  world.statusMessage = "FIRST ANNIVERSARY FIREWORKS LAUNCHED";
+  seedActionStatus.textContent = world.statusMessage;
+  seedActionStatus.classList.remove("seed-action-status--error");
+  addBattleLog("system", "1ST ANNIVERSARY · FIREWORKS LAUNCHED");
+  emitUiAudio("ui-confirm", "normal", { celebration: "first-anniversary" });
 }
 
 function handlePointerDown(event: PointerEvent): void {
